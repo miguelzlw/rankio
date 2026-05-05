@@ -44,27 +44,32 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
   }
 
   async function salvar() {
-    const config = tipo === '1v1' && formato === 'grupos-mata-mata'
-      ? { numGrupos: Number(numGrupos), timesQueAvancam: Number(timesQueAvancam) }
-      : tipo === 'coletivo'
-        ? { numRodadas: Number(numRodadas) }
-        : {};
+    try {
+      const config = tipo === '1v1' && formato === 'grupos-mata-mata'
+        ? { numGrupos: Number(numGrupos), timesQueAvancam: Number(timesQueAvancam) }
+        : tipo === 'coletivo'
+          ? { numRodadas: Number(numRodadas) }
+          : {};
 
-    const dados = {
-      nome,
-      tipo,
-      formato: tipo === '1v1' ? formato : null,
-      config,
-      regras,
-      timesParticipantes: participantes,
-    };
+      const dados = {
+        nome,
+        tipo,
+        formato: tipo === '1v1' ? formato : null,
+        config,
+        regras,
+        timesParticipantes: participantes,
+      };
 
-    if (editando) {
-      await atualizarEsporte(esporteEdicao.id, dados);
-    } else {
-      await criarEsporte(dados);
+      if (editando) {
+        await atualizarEsporte(esporteEdicao.id, dados);
+      } else {
+        await criarEsporte(dados);
+      }
+      onClose();
+    } catch (error) {
+      console.error('Erro ao salvar esporte:', error);
+      alert('Erro ao salvar. Verifique sua conexão ou dados e tente novamente.');
     }
-    onClose();
   }
 
   function fechar() {
