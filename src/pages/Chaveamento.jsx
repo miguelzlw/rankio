@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEsportes, useJogos, useTimes } from '../hooks/useDados.js';
+import { GitBranch, Settings, ArrowRight } from 'lucide-react';
 import BracketMataMata from '../components/chaveamento/BracketMataMata.jsx';
 import GrupoTable from '../components/chaveamento/GrupoTable.jsx';
 import RodadasColetivo from '../components/chaveamento/RodadasColetivo.jsx';
@@ -11,6 +12,29 @@ export default function Chaveamento() {
   const { data: jogos } = useJogos();
   const { data: times } = useTimes();
 
+  // Sem esportes criados
+  if (esportes.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+        <div className="w-20 h-20 rounded-full bg-cyan-500/10 flex items-center justify-center mb-6">
+          <GitBranch size={40} className="text-cyan-400" />
+        </div>
+        <h1 className="text-xl font-bold mb-2">Sem chaveamentos</h1>
+        <p className="text-slate-400 text-sm mb-8 max-w-xs">
+          Crie <strong>times</strong> e <strong>esportes</strong> primeiro, depois gere os jogos na aba de Configuração.
+        </p>
+        <button
+          onClick={() => navigate('/configuracao')}
+          className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold px-6 py-3 rounded-xl shadow-lg shadow-cyan-500/20 transition active:scale-95"
+        >
+          <Settings size={20} />
+          Ir para Configuração
+          <ArrowRight size={18} />
+        </button>
+      </div>
+    );
+  }
+
   const esporte = esporteId ? esportes.find((e) => e.id === esporteId) : esportes[0];
   const timesPorId = new Map(times.map((t) => [t.id, t]));
 
@@ -18,31 +42,36 @@ export default function Chaveamento() {
     <div>
       <h1 className="text-2xl font-bold mb-3">Chaveamento</h1>
 
-      {esportes.length === 0 ? (
-        <p className="text-sm text-slate-500">Crie um esporte primeiro.</p>
-      ) : (
-        <>
-          <select
-            value={esporte?.id ?? ''}
-            onChange={(e) => navigate(`/chaveamento/${e.target.value}`)}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 mb-4 bg-white"
-          >
-            {esportes.map((e) => (
-              <option key={e.id} value={e.id}>{e.nome}</option>
-            ))}
-          </select>
+      <select
+        value={esporte?.id ?? ''}
+        onChange={(e) => navigate(`/chaveamento/${e.target.value}`)}
+        className="w-full border border-slate-600 bg-slate-800 text-white rounded-lg px-3 py-2 mb-4"
+      >
+        {esportes.map((e) => (
+          <option key={e.id} value={e.id}>{e.nome}</option>
+        ))}
+      </select>
 
-          {esporte && <RenderEsporte esporte={esporte} jogos={jogos} times={times} timesPorId={timesPorId} />}
-        </>
-      )}
+      {esporte && <RenderEsporte esporte={esporte} jogos={jogos} times={times} timesPorId={timesPorId} />}
     </div>
   );
 }
 
 function RenderEsporte({ esporte, jogos, times, timesPorId }) {
   const jogosDoEsporte = jogos.filter((j) => j.esporteId === esporte.id);
+
   if (jogosDoEsporte.length === 0) {
-    return <p className="text-sm text-slate-500">Nenhum jogo gerado ainda.</p>;
+    return (
+      <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700/30 text-center">
+        <GitBranch size={32} className="text-slate-500 mx-auto mb-3" />
+        <p className="text-slate-400 text-sm">
+          Nenhum jogo gerado para <strong>{esporte.nome}</strong>.
+        </p>
+        <p className="text-slate-500 text-xs mt-1">
+          Vá em Configuração → Jogos e gere o chaveamento deste esporte.
+        </p>
+      </div>
+    );
   }
 
   if (esporte.tipo === 'coletivo') {
