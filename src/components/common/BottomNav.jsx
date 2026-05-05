@@ -10,7 +10,7 @@ const itens = [
 
 export default function BottomNav() {
   return (
-    <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 safe-bottom z-30">
+    <nav className="fixed bottom-0 inset-x-0 bg-surface border-t border-white/10 safe-bottom z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
       <ul className="flex justify-around max-w-2xl mx-auto">
         {itens.map(({ to, label, Icon }) => (
           <li key={to} className="flex-1">
@@ -18,7 +18,7 @@ export default function BottomNav() {
               to={to}
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center py-2 gap-1 text-xs font-medium transition ${
-                  isActive ? 'text-slate-900' : 'text-slate-400 hover:text-slate-700'
+                  isActive ? 'text-accent' : 'text-slate-400 hover:text-slate-300'
                 }`
               }
             >
