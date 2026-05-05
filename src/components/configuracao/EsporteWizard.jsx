@@ -61,9 +61,9 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
       };
 
       if (editando) {
-        await atualizarEsporte(esporteEdicao.id, dados);
+        atualizarEsporte(esporteEdicao.id, dados).catch(e => console.error(e));
       } else {
-        await criarEsporte(dados);
+        criarEsporte(dados).catch(e => console.error(e));
       }
       onClose();
     } catch (error) {

@@ -22,10 +22,12 @@ export default function TimesManager() {
   async function salvar() {
     if (!editando.nome.trim()) return;
     try {
+      // Salva de forma "otimista" no Firebase, sem esperar (await) para fechar a tela.
+      // O SDK do Firebase atualizará a UI imediatamente usando cache local.
       if (editando.id) {
-        await atualizarTime(editando.id, { nome: editando.nome, cor: editando.cor });
+        atualizarTime(editando.id, { nome: editando.nome, cor: editando.cor }).catch(e => console.error(e));
       } else {
-        await criarTime({ nome: editando.nome, cor: editando.cor });
+        criarTime({ nome: editando.nome, cor: editando.cor }).catch(e => console.error(e));
       }
       setEditando(null);
     } catch (error) {
