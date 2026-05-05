@@ -4,14 +4,16 @@ import {
   collection,
   doc,
   addDoc,
-  setDoc,
   getDoc,
   getDocs,
   updateDoc,
   deleteDoc,
   writeBatch,
   serverTimestamp,
+  arrayUnion,
+  arrayRemove,
 } from "firebase/firestore";
+import { calcularPlacarJogo } from "./scoring";
 
 /**
  * Collections references
@@ -20,9 +22,9 @@ export const timesCol = collection(db, "times");
 export const esportesCol = collection(db, "esportes");
 export const jogosCol = collection(db, "jogos");
 
-/**
- * CRUD wrappers for Times
- */
+// ═══════════════════════════════════
+//  CRUD — Times
+// ═══════════════════════════════════
 export const criarTime = async (time) => {
   const docRef = await addDoc(timesCol, {
     ...time,
@@ -40,9 +42,9 @@ export const deletarTime = async (id) => {
   await deleteDoc(doc(timesCol, id));
 };
 
-/**
- * CRUD wrappers for Esportes
- */
+// ═══════════════════════════════════
+//  CRUD — Esportes
+// ═══════════════════════════════════
 export const criarEsporte = async (esporte) => {
   const docRef = await addDoc(esportesCol, {
     ...esporte,
@@ -60,15 +62,15 @@ export const deletarEsporte = async (id) => {
   await deleteDoc(doc(esportesCol, id));
 };
 
-/**
- * CRUD wrappers for Jogos
- */
+// ═══════════════════════════════════
+//  CRUD — Jogos
+// ═══════════════════════════════════
 export const criarJogo = async (jogo) => {
   const docRef = await addDoc(jogosCol, {
     ...jogo,
     eventos: [],
     criadoEm: serverTimestamp(),
-    status: "pendente", // pendente | em_andamento | finalizado
+    status: "pendente",
   });
   return docRef.id;
 };
@@ -82,28 +84,89 @@ export const deletarJogo = async (id) => {
   await deleteDoc(doc(jogosCol, id));
 };
 
+// ═══════════════════════════════════
+//  Jogo ao vivo — iniciar, lançar evento, remover evento
+// ═══════════════════════════════════
+
 /**
- * Finaliza um jogo de forma atômica.
- * Calcula placar, define vencedor e avança bracket se necessário.
+ * Marca jogo como ao_vivo.
  */
-export const finalizarJogo = async (jogoId, calcularPlacar, avancarBracket) => {
+export const iniciarJogo = async (jogoId) => {
+  const ref = doc(jogosCol, jogoId);
+  await updateDoc(ref, { status: "ao_vivo", iniciadoEm: serverTimestamp() });
+};
+
+/**
+ * Lança um evento e recalcula o placar no Firestore.
+ * @param {Object} jogo — doc do jogo (com id, timeAId, timeBId, eventos)
+ * @param {Array} regras — regras do esporte
+ * @param {Object} evento — { id, regraId, regraNome, timeAfetado, timestamp, timestampCronometro }
+ */
+export const lancarEvento = async (jogo, regras, evento) => {
+  const ref = doc(jogosCol, jogo.id);
+  const novosEventos = [...(jogo.eventos || []), evento];
+  const placar = calcularPlacarJogo(novosEventos, regras, jogo.timeAId, jogo.timeBId);
+  await updateDoc(ref, {
+    eventos: novosEventos,
+    pontosTimeA: placar.pontosA,
+    pontosTimeB: placar.pontosB,
+  });
+};
+
+/**
+ * Remove um evento pela id e recalcula o placar.
+ */
+export const removerEvento = async (jogo, regras, eventoId) => {
+  const ref = doc(jogosCol, jogo.id);
+  const novosEventos = (jogo.eventos || []).filter((e) => e.id !== eventoId);
+  const placar = calcularPlacarJogo(novosEventos, regras, jogo.timeAId, jogo.timeBId);
+  await updateDoc(ref, {
+    eventos: novosEventos,
+    pontosTimeA: placar.pontosA,
+    pontosTimeB: placar.pontosB,
+  });
+};
+
+// ═══════════════════════════════════
+//  Finalizar jogo (batch atômico)
+// ═══════════════════════════════════
+
+/**
+ * Finaliza um jogo. Chamada pelo JogoDetalhe:
+ *   finalizarJogo(jogo, esporte, todosOsJogos)
+ * Retorna { ok: boolean }
+ */
+export const finalizarJogo = async (jogo, esporte, todosOsJogos) => {
+  const placar = calcularPlacarJogo(
+    jogo.eventos || [],
+    esporte.regras || [],
+    jogo.timeAId,
+    jogo.timeBId
+  );
+
+  const ehMataMata = jogo.fase === "mata-mata";
+  const empate = placar.pontosA === placar.pontosB;
+  if (ehMataMata && empate) {
+    return { ok: false };
+  }
+
+  const vencedorId =
+    placar.pontosA > placar.pontosB ? jogo.timeAId :
+    placar.pontosB > placar.pontosA ? jogo.timeBId :
+    null;
+
   const batch = writeBatch(db);
-  const jogoRef = doc(jogosCol, jogoId);
-  const jogoSnap = await getDoc(jogoRef);
-  if (!jogoSnap.exists()) throw new Error("Jogo não encontrado");
-  const jogo = jogoSnap.data();
-  const placar = calcularPlacar(jogo.eventos, jogo.regras);
-  const vencedorId = placar.pontosA > placar.pontosB ? jogo.timeAId : placar.pontosA < placar.pontosB ? jogo.timeBId : null; // empate pode ficar null
+  const jogoRef = doc(jogosCol, jogo.id);
 
   batch.update(jogoRef, {
-    pontosA: placar.pontosA,
-    pontosB: placar.pontosB,
-    vencedorId,
+    pontosTimeA: placar.pontosA,
+    pontosTimeB: placar.pontosB,
+    vencedor: vencedorId,
     status: "finalizado",
     finalizadoEm: serverTimestamp(),
   });
 
-  // Avança bracket se houver próximoJogoId e for mata‑mata
+  // Avança bracket se houver próximoJogoId
   if (jogo.proximoJogoId && vencedorId) {
     const proximoRef = doc(jogosCol, jogo.proximoJogoId);
     const campoSlot = jogo.slot === "A" ? "timeAId" : "timeBId";
@@ -111,11 +174,13 @@ export const finalizarJogo = async (jogoId, calcularPlacar, avancarBracket) => {
   }
 
   await batch.commit();
+  return { ok: true };
 };
 
-/**
- * Exporta toda a base de dados como JSON (usado por backup.js)
- */
+// ═══════════════════════════════════
+//  Backup helpers
+// ═══════════════════════════════════
+
 export const exportarDados = async () => {
   const [timesSnap, esportesSnap, jogosSnap] = await Promise.all([
     getDocs(timesCol),
@@ -128,9 +193,6 @@ export const exportarDados = async () => {
   return { versao: 1, exportadoEm: new Date().toISOString(), times, esportes, jogos };
 };
 
-/**
- * Reset total – deleta tudo em batches de 500 (máximo do writeBatch)
- */
 export const resetTotal = async () => {
   const batchSize = 500;
   const collections = [timesCol, esportesCol, jogosCol];
@@ -139,7 +201,7 @@ export const resetTotal = async () => {
     while (!snapshot.empty) {
       const batch = writeBatch(db);
       snapshot.docs.slice(0, batchSize).forEach((docSnap) => {
-        batch.delete(doc(db, col.path, docSnap.id));
+        batch.delete(docSnap.ref);
       });
       await batch.commit();
       snapshot = await getDocs(col);
@@ -147,15 +209,15 @@ export const resetTotal = async () => {
   }
 };
 
-// ── Aliases usados pelos componentes ──
+// ═══════════════════════════════════
+//  Aliases usados pelos componentes
+// ═══════════════════════════════════
 export const removerTime = deletarTime;
 export const removerEsporte = deletarEsporte;
 export const removerJogo = deletarJogo;
 
 /**
  * Gera chaveamento de um esporte e persiste todos os jogos em batch.
- * @param {string} esporteId
- * @param {Array} jogosGerados — array de objetos jogo vindos de brackets.js
  */
 export const gerarChaveamento = async (esporteId, jogosGerados) => {
   const batchSize = 500;
@@ -175,4 +237,3 @@ export const gerarChaveamento = async (esporteId, jogosGerados) => {
     await batch.commit();
   }
 };
-
