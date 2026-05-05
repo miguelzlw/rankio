@@ -2,20 +2,27 @@ import { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../services/firebase.js';
 
+const cache = {};
+
 // Hook generico que escuta uma colecao e retorna { data, loading, error }.
 export default function useFirestoreCollection(nome, opcoes = {}) {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Inicializa com o cache se existir, senao array vazio. Se tem cache, não precisa de loading inicial bloqueante.
+  const [data, setData] = useState(cache[nome] || []);
+  const [loading, setLoading] = useState(!cache[nome]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    setLoading(true);
+    if (!cache[nome]) {
+      setLoading(true);
+    }
     setError(null);
 
     // Timeout de fallback caso o Firebase não consiga conectar
     const timeoutId = setTimeout(() => {
       setLoading(false);
-      setError(new Error('Tempo limite de conexão excedido. Verifique sua internet ou a configuração do Firebase.'));
+      if (!cache[nome]) {
+        setError(new Error('Tempo limite de conexão excedido. Verifique sua internet ou a configuração do Firebase.'));
+      }
     }, 5000);
 
     const ref = opcoes.orderBy
@@ -26,7 +33,9 @@ export default function useFirestoreCollection(nome, opcoes = {}) {
       ref,
       (snap) => {
         clearTimeout(timeoutId);
-        setData(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
+        const docs = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+        cache[nome] = docs; // Atualiza o cache global
+        setData(docs);
         setLoading(false);
       },
       (err) => {

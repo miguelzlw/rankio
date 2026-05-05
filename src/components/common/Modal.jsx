@@ -5,7 +5,7 @@ import React from "react";
  * Modal genérico com backdrop de vidro (glass) e animação.
  * Recebe `open`, `onClose` e `children`.
  */
-export default function Modal({ open, onClose, title, children }) {
+export default function Modal({ open, onClose, title, children, footer }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-60 backdrop-blur-sm">
