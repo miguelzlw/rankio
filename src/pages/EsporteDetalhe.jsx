@@ -36,31 +36,31 @@ export default function EsporteDetalhe() {
     <div>
       <button
         onClick={() => navigate(-1)}
-        className="text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 text-sm mb-2"
+        className="text-slate-400 hover:text-text inline-flex items-center gap-1 text-sm mb-2 transition"
       >
         <ArrowLeft size={16} /> Voltar
       </button>
       <h1 className="text-2xl font-bold mb-1">{esporte.nome}</h1>
-      <p className="text-sm text-slate-500 mb-4">
+      <p className="text-sm text-slate-400 mb-4">
         {esporte.tipo === '1v1' ? '1 vs 1' : 'Coletivo'}
         {esporte.formato &&
           ' • ' + (esporte.formato === 'mata-mata' ? 'Mata-mata' : 'Grupos + Mata-mata')}
       </p>
 
       {classificacao.length > 0 && (
-        <section className="bg-white rounded-xl p-3 shadow-sm mb-4">
-          <h2 className="font-semibold mb-2 text-sm text-slate-700">Classificação parcial</h2>
+        <section className="bg-surface/50 border border-white/10 rounded-xl p-3 mb-4">
+          <h2 className="font-semibold mb-2 text-sm text-slate-300">Classificação parcial</h2>
           <ul>
             {classificacao.map((c, i) => (
               <li
                 key={c.time.id}
-                className="flex items-center gap-2 py-1.5 border-b border-slate-50 last:border-0"
+                className="flex items-center gap-2 py-1.5 border-b border-white/5 last:border-0"
               >
                 <span className="w-6 text-slate-400 text-sm">{i + 1}º</span>
                 <TimeChip time={c.time} size="sm" />
                 <span
                   className={`ml-auto font-semibold tabular-nums text-sm ${
-                    c.pontos < 0 ? 'text-red-600' : ''
+                    c.pontos < 0 ? 'text-red-400' : 'text-text'
                   }`}
                 >
                   {c.pontos > 0 ? '+' : ''}
@@ -75,8 +75,8 @@ export default function EsporteDetalhe() {
       <section>
         <h2 className="font-semibold mb-2">Jogos</h2>
         {jogosDoEsporte.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Nenhum jogo gerado. Vá em Configuração &gt; Gerenciar Jogos.
+          <p className="text-sm text-slate-400">
+            Nenhum jogo gerado. Vá em Configuração &gt; Jogos.
           </p>
         ) : (
           <ul className="space-y-2">
@@ -87,10 +87,10 @@ export default function EsporteDetalhe() {
                 <li key={j.id}>
                   <Link
                     to={`/esportes/${esporteId}/jogos/${j.id}`}
-                    className="block bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition"
+                    className="block bg-surface/50 border border-white/10 rounded-xl p-3 hover:border-accent/40 hover:bg-surface/70 transition"
                   >
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-slate-400">
                         Jogo {j.ordem}
                         {j.fase === 'grupos' && j.grupoId && ` • Grupo ${j.grupoId.replace('G', '')}`}
                         {j.fase === 'mata-mata' && ' • Mata-mata'}
@@ -100,7 +100,7 @@ export default function EsporteDetalhe() {
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <TimeChip time={timeA} size="sm" placeholder="A definir" />
-                      <span className="font-bold text-slate-700 tabular-nums">
+                      <span className="font-bold text-text tabular-nums">
                         {j.pontosTimeA ?? 0} × {j.pontosTimeB ?? 0}
                       </span>
                       <TimeChip time={timeB} size="sm" placeholder="A definir" />

@@ -48,7 +48,7 @@ export default function JogosManager() {
       <select
         value={esporteSelecionado}
         onChange={(e) => setEsporteSelecionado(e.target.value)}
-        className="w-full border border-slate-300 rounded-lg px-3 py-2 mb-3 bg-white"
+        className="w-full border border-white/20 bg-surface text-text rounded-lg px-3 py-2 mb-3 focus:outline-none focus:border-accent"
       >
         <option value="">Selecione um esporte</option>
         {esportes.map((e) => (
@@ -78,10 +78,10 @@ export default function JogosManager() {
               {jogosFiltrados.map((j) => (
                 <li
                   key={j.id}
-                  className="bg-white rounded-xl p-3 shadow-sm flex items-center gap-2"
+                  className="bg-surface/50 border border-white/10 rounded-xl p-3 flex items-center gap-2"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+                    <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
                       <span>Jogo {j.ordem}</span>
                       <Badge status={j.status} />
                     </div>
@@ -102,12 +102,13 @@ export default function JogosManager() {
                   {j.status === 'agendado' ? (
                     <button
                       onClick={() => setRemovendo(j)}
-                      className="text-slate-400 hover:text-red-600 p-1"
+                      className="text-slate-400 hover:text-red-400 p-1 transition"
+                      aria-label="Remover"
                     >
                       <Trash2 size={16} />
                     </button>
                   ) : (
-                    <span className="text-xs text-slate-400">imutável</span>
+                    <span className="text-xs text-slate-500">imutável</span>
                   )}
                 </li>
               ))}

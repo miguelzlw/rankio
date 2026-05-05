@@ -1,250 +1,234 @@
-// src/services/firestore.js
-import { db } from "./firebase";
+// Wrappers CRUD em cima do Firestore. Centraliza serverTimestamp e operacoes
+// em batch que precisam ser atomicas (finalizar jogo + avancar bracket).
+
 import {
   collection,
   doc,
+  setDoc,
   addDoc,
-  getDoc,
-  getDocs,
   updateDoc,
   deleteDoc,
-  writeBatch,
   serverTimestamp,
-  arrayUnion,
-  arrayRemove,
-} from "firebase/firestore";
-import { calcularPlacarJogo } from "./scoring";
+  writeBatch,
+  getDocs,
+  query,
+  where,
+} from 'firebase/firestore';
+import { db } from './firebase.js';
+import { calcularPlacarJogo } from './scoring.js';
+import {
+  gerarBracketMataMata,
+  gerarFaseGrupos,
+  gerarRodadasColetivo,
+  gerarMataMataPosGrupos,
+} from './brackets.js';
 
-/**
- * Collections references
- */
-export const timesCol = collection(db, "times");
-export const esportesCol = collection(db, "esportes");
-export const jogosCol = collection(db, "jogos");
+export const timesCol = () => collection(db, 'times');
+export const esportesCol = () => collection(db, 'esportes');
+export const jogosCol = () => collection(db, 'jogos');
 
-// ═══════════════════════════════════
-//  CRUD — Times
-// ═══════════════════════════════════
-export const criarTime = async (time) => {
-  const docRef = await addDoc(timesCol, {
-    ...time,
+// ========== TIMES ==========
+export async function criarTime({ nome, cor }) {
+  const ref = doc(timesCol());
+  await setDoc(ref, {
+    id: ref.id,
+    nome,
+    cor,
     criadoEm: serverTimestamp(),
   });
-  return docRef.id;
-};
+  return ref.id;
+}
 
-export const atualizarTime = async (id, data) => {
-  const ref = doc(timesCol, id);
-  await updateDoc(ref, { ...data, atualizadoEm: serverTimestamp() });
-};
+export async function atualizarTime(id, dados) {
+  await updateDoc(doc(db, 'times', id), { ...dados, atualizadoEm: serverTimestamp() });
+}
 
-export const deletarTime = async (id) => {
-  await deleteDoc(doc(timesCol, id));
-};
+export async function removerTime(id) {
+  await deleteDoc(doc(db, 'times', id));
+}
 
-// ═══════════════════════════════════
-//  CRUD — Esportes
-// ═══════════════════════════════════
-export const criarEsporte = async (esporte) => {
-  const docRef = await addDoc(esportesCol, {
-    ...esporte,
+// ========== ESPORTES ==========
+export async function criarEsporte({ nome, tipo, formato, config, regras, timesParticipantes }) {
+  const ref = doc(esportesCol());
+  await setDoc(ref, {
+    id: ref.id,
+    nome,
+    tipo,
+    formato: formato ?? null,
+    config: config ?? {},
+    regras: regras ?? [],
+    timesParticipantes: timesParticipantes ?? [],
     criadoEm: serverTimestamp(),
   });
-  return docRef.id;
-};
+  return ref.id;
+}
 
-export const atualizarEsporte = async (id, data) => {
-  const ref = doc(esportesCol, id);
-  await updateDoc(ref, { ...data, atualizadoEm: serverTimestamp() });
-};
+export async function atualizarEsporte(id, dados) {
+  await updateDoc(doc(db, 'esportes', id), { ...dados, atualizadoEm: serverTimestamp() });
+}
 
-export const deletarEsporte = async (id) => {
-  await deleteDoc(doc(esportesCol, id));
-};
+// Remove esporte e cascateia todos os jogos associados.
+export async function removerEsporte(id) {
+  const jogosSnap = await getDocs(query(jogosCol(), where('esporteId', '==', id)));
+  const batch = writeBatch(db);
+  jogosSnap.forEach((s) => batch.delete(s.ref));
+  batch.delete(doc(db, 'esportes', id));
+  await batch.commit();
+}
 
-// ═══════════════════════════════════
-//  CRUD — Jogos
-// ═══════════════════════════════════
-export const criarJogo = async (jogo) => {
-  const docRef = await addDoc(jogosCol, {
-    ...jogo,
-    eventos: [],
-    criadoEm: serverTimestamp(),
-    status: "pendente",
+// ========== JOGOS ==========
+export async function atualizarJogo(id, dados) {
+  await updateDoc(doc(db, 'jogos', id), dados);
+}
+
+export async function removerJogo(id) {
+  await deleteDoc(doc(db, 'jogos', id));
+}
+
+export async function iniciarJogo(id) {
+  await updateDoc(doc(db, 'jogos', id), {
+    status: 'ao_vivo',
+    iniciadoEm: serverTimestamp(),
   });
-  return docRef.id;
-};
+}
 
-export const atualizarJogo = async (id, data) => {
-  const ref = doc(jogosCol, id);
-  await updateDoc(ref, { ...data, atualizadoEm: serverTimestamp() });
-};
-
-export const deletarJogo = async (id) => {
-  await deleteDoc(doc(jogosCol, id));
-};
-
-// ═══════════════════════════════════
-//  Jogo ao vivo — iniciar, lançar evento, remover evento
-// ═══════════════════════════════════
-
-/**
- * Marca jogo como ao_vivo.
- */
-export const iniciarJogo = async (jogoId) => {
-  const ref = doc(jogosCol, jogoId);
-  await updateDoc(ref, { status: "ao_vivo", iniciadoEm: serverTimestamp() });
-};
-
-/**
- * Lança um evento e recalcula o placar no Firestore.
- * @param {Object} jogo — doc do jogo (com id, timeAId, timeBId, eventos)
- * @param {Array} regras — regras do esporte
- * @param {Object} evento — { id, regraId, regraNome, timeAfetado, timestamp, timestampCronometro }
- */
-export const lancarEvento = async (jogo, regras, evento) => {
-  const ref = doc(jogosCol, jogo.id);
-  const novosEventos = [...(jogo.eventos || []), evento];
-  const placar = calcularPlacarJogo(novosEventos, regras, jogo.timeAId, jogo.timeBId);
-  await updateDoc(ref, {
-    eventos: novosEventos,
-    pontosTimeA: placar.pontosA,
-    pontosTimeB: placar.pontosB,
+// Adiciona evento ao jogo e recalcula placar.
+export async function lancarEvento(jogo, regras, novoEvento) {
+  const eventos = [...(jogo.eventos || []), novoEvento];
+  const { pontosTimeA, pontosTimeB } = calcularPlacarJogo(eventos, regras);
+  await updateDoc(doc(db, 'jogos', jogo.id), {
+    eventos,
+    pontosTimeA,
+    pontosTimeB,
   });
-};
+}
 
-/**
- * Remove um evento pela id e recalcula o placar.
- */
-export const removerEvento = async (jogo, regras, eventoId) => {
-  const ref = doc(jogosCol, jogo.id);
-  const novosEventos = (jogo.eventos || []).filter((e) => e.id !== eventoId);
-  const placar = calcularPlacarJogo(novosEventos, regras, jogo.timeAId, jogo.timeBId);
-  await updateDoc(ref, {
-    eventos: novosEventos,
-    pontosTimeA: placar.pontosA,
-    pontosTimeB: placar.pontosB,
+// Remove evento e recalcula placar.
+export async function removerEvento(jogo, regras, eventoId) {
+  const eventos = (jogo.eventos || []).filter((e) => e.id !== eventoId);
+  const { pontosTimeA, pontosTimeB } = calcularPlacarJogo(eventos, regras);
+  await updateDoc(doc(db, 'jogos', jogo.id), {
+    eventos,
+    pontosTimeA,
+    pontosTimeB,
   });
-};
+}
 
-// ═══════════════════════════════════
-//  Finalizar jogo (batch atômico)
-// ═══════════════════════════════════
+// Finaliza jogo: define vencedor, atualiza status, e (se mata-mata) propaga
+// vencedor pro proximo jogo. Se foi o ultimo jogo da fase de grupos, gera o mata-mata.
+// Retorna { ok: true } ou { ok: false, motivo }.
+export async function finalizarJogo(jogo, esporte, todosJogos = []) {
+  const ehMataMata = jogo.fase === 'mata-mata';
+  const empate = (jogo.pontosTimeA ?? 0) === (jogo.pontosTimeB ?? 0);
 
-/**
- * Finaliza um jogo. Chamada pelo JogoDetalhe:
- *   finalizarJogo(jogo, esporte, todosOsJogos)
- * Retorna { ok: boolean }
- */
-export const finalizarJogo = async (jogo, esporte, todosOsJogos) => {
-  const placar = calcularPlacarJogo(
-    jogo.eventos || [],
-    esporte.regras || [],
-    jogo.timeAId,
-    jogo.timeBId
-  );
-
-  const ehMataMata = jogo.fase === "mata-mata";
-  const empate = placar.pontosA === placar.pontosB;
   if (ehMataMata && empate) {
-    return { ok: false };
+    return { ok: false, motivo: 'empate' };
   }
 
-  const vencedorId =
-    placar.pontosA > placar.pontosB ? jogo.timeAId :
-    placar.pontosB > placar.pontosA ? jogo.timeBId :
-    null;
+  const vencedor =
+    (jogo.pontosTimeA ?? 0) > (jogo.pontosTimeB ?? 0)
+      ? jogo.timeAId
+      : (jogo.pontosTimeB ?? 0) > (jogo.pontosTimeA ?? 0)
+        ? jogo.timeBId
+        : null;
 
   const batch = writeBatch(db);
-  const jogoRef = doc(jogosCol, jogo.id);
-
-  batch.update(jogoRef, {
-    pontosTimeA: placar.pontosA,
-    pontosTimeB: placar.pontosB,
-    vencedor: vencedorId,
-    status: "finalizado",
+  batch.update(doc(db, 'jogos', jogo.id), {
+    status: 'finalizado',
+    vencedor,
     finalizadoEm: serverTimestamp(),
   });
 
-  // Avança bracket se houver próximoJogoId
-  if (jogo.proximoJogoId && vencedorId) {
-    const proximoRef = doc(jogosCol, jogo.proximoJogoId);
-    const campoSlot = jogo.slot === "A" ? "timeAId" : "timeBId";
-    batch.update(proximoRef, { [campoSlot]: vencedorId });
+  // Avanco automatico do mata-mata
+  if (ehMataMata && jogo.proximoJogoId && vencedor) {
+    const campo = jogo.slot === 'A' ? 'timeAId' : 'timeBId';
+    batch.update(doc(db, 'jogos', jogo.proximoJogoId), { [campo]: vencedor });
   }
 
-  try {
-    await batch.commit();
-    return { ok: true };
-  } catch (error) {
-    console.error("Erro ao finalizar jogo:", error);
-    return { ok: false, error };
-  }
-};
+  await batch.commit();
 
-// ═══════════════════════════════════
-//  Backup helpers
-// ═══════════════════════════════════
+  // Geracao automatica do mata-mata pos-grupos.
+  if (esporte && esporte.formato === 'grupos-mata-mata' && jogo.fase === 'grupos') {
+    const jogosDoEsporte = todosJogos.filter((j) => j.esporteId === esporte.id);
+    const todosGruposFinalizados = jogosDoEsporte
+      .filter((j) => j.fase === 'grupos')
+      .every((j) => j.id === jogo.id || j.status === 'finalizado');
+    const naoTemMataMata = !jogosDoEsporte.some((j) => j.fase === 'mata-mata');
 
-export const exportarDados = async () => {
-  const [timesSnap, esportesSnap, jogosSnap] = await Promise.all([
-    getDocs(timesCol),
-    getDocs(esportesCol),
-    getDocs(jogosCol),
-  ]);
-  const times = timesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const esportes = esportesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const jogos = jogosSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  return { versao: 1, exportadoEm: new Date().toISOString(), times, esportes, jogos };
-};
-
-export const resetTotal = async () => {
-  const batchSize = 500;
-  const collections = [timesCol, esportesCol, jogosCol];
-  for (const col of collections) {
-    let snapshot = await getDocs(col);
-    while (!snapshot.empty) {
-      const batch = writeBatch(db);
-      snapshot.docs.slice(0, batchSize).forEach((docSnap) => {
-        batch.delete(docSnap.ref);
+    if (todosGruposFinalizados && naoTemMataMata) {
+      const timesSnap = await getDocs(timesCol());
+      const times = timesSnap.docs.map((d) => d.data());
+      // Reflete o estado pos-finalizacao no array em memoria
+      const jogosAtualizados = jogosDoEsporte.map((j) =>
+        j.id === jogo.id ? { ...j, status: 'finalizado', vencedor } : j
+      );
+      const novosJogos = gerarMataMataPosGrupos({
+        esporteId: esporte.id,
+        esporteConfig: esporte.config,
+        times,
+        jogos: jogosAtualizados,
       });
-      await batch.commit();
-      snapshot = await getDocs(col);
+      if (novosJogos.length > 0) {
+        const batchMM = writeBatch(db);
+        for (const novo of novosJogos) {
+          batchMM.set(doc(db, 'jogos', novo.id), {
+            ...novo,
+            criadoEm: serverTimestamp(),
+          });
+        }
+        await batchMM.commit();
+      }
     }
   }
-};
 
-// ═══════════════════════════════════
-//  Aliases usados pelos componentes
-// ═══════════════════════════════════
-export const removerTime = deletarTime;
-export const removerEsporte = deletarEsporte;
-export const removerJogo = deletarJogo;
+  return { ok: true };
+}
 
-/**
- * Gera chaveamento de um esporte e persiste todos os jogos em batch.
- */
-export const gerarChaveamento = async (esporteId, jogosGerados) => {
-  const batchSize = 500;
-  try {
-    for (let i = 0; i < jogosGerados.length; i += batchSize) {
-      const batch = writeBatch(db);
-      const slice = jogosGerados.slice(i, i + batchSize);
-      slice.forEach((jogo) => {
-        const ref = jogo.id ? doc(jogosCol, jogo.id) : doc(jogosCol);
-        batch.set(ref, {
-          ...jogo,
-          esporteId,
-          eventos: [],
-          status: jogo.status || "pendente",
-          criadoEm: serverTimestamp(),
-        });
-      });
-      await batch.commit();
-    }
-    return { ok: true };
-  } catch (error) {
-    console.error("Erro ao gerar chaveamento:", error);
-    return { ok: false, error };
+// ========== GERACAO DE CHAVEAMENTO ==========
+// Apaga jogos existentes do esporte e gera todos os jogos de acordo com seu tipo/formato.
+export async function gerarChaveamento(esporte, times) {
+  // Apaga jogos atuais do esporte
+  const existentes = await getDocs(query(jogosCol(), where('esporteId', '==', esporte.id)));
+  if (!existentes.empty) {
+    const batchDel = writeBatch(db);
+    existentes.forEach((s) => batchDel.delete(s.ref));
+    await batchDel.commit();
   }
-};
+
+  const participantes = (times || []).filter((t) =>
+    (esporte.timesParticipantes || []).includes(t.id)
+  );
+
+  let novosJogos = [];
+  let composicaoGrupos = null;
+
+  if (esporte.tipo === '1v1') {
+    if (esporte.formato === 'mata-mata') {
+      novosJogos = gerarBracketMataMata(esporte.id, participantes);
+    } else if (esporte.formato === 'grupos-mata-mata') {
+      const numGrupos = Number(esporte.config?.numGrupos) || 2;
+      const { jogos, composicao } = gerarFaseGrupos(esporte.id, participantes, numGrupos);
+      novosJogos = jogos;
+      composicaoGrupos = composicao;
+    }
+  } else if (esporte.tipo === 'coletivo') {
+    const numRodadas = Number(esporte.config?.numRodadas) || 1;
+    novosJogos = gerarRodadasColetivo(esporte.id, participantes, numRodadas);
+  }
+
+  if (novosJogos.length === 0 && !composicaoGrupos) return;
+
+  const batch = writeBatch(db);
+  for (const j of novosJogos) {
+    batch.set(doc(db, 'jogos', j.id), {
+      ...j,
+      criadoEm: serverTimestamp(),
+    });
+  }
+  if (composicaoGrupos) {
+    batch.update(doc(db, 'esportes', esporte.id), {
+      'config.grupos': composicaoGrupos,
+    });
+  }
+  await batch.commit();
+}

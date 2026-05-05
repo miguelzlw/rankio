@@ -1,268 +1,265 @@
-// src/services/brackets.js
-/**
- * Funções puras para gerar e avançar chaveamentos.
- * Todas as funções recebem e retornam objetos simples, sem efeitos colaterais.
- */
+// Funcoes puras para gerar chaveamentos. Retornam estruturas em memoria
+// que serao gravadas em batch pela camada de firestore.js.
+//
+// CONTRATOS:
+// - Status inicial dos jogos = 'agendado'.
+// - Coletivo usa fase no formato 'rodada-N' (ex: 'rodada-1').
+// - Mata-mata usa fase 'mata-mata'. Fase de grupos usa 'grupos'.
+// - Cada jogo de mata-mata pode ter proximoJogoId + slot ('A' | 'B') indicando
+//   onde o vencedor entra na proxima rodada.
+// - Times participantes "vazios" (bye) viram null no slot e o jogo ja eh
+//   marcado como finalizado com vencedor automatico.
 
-/**
- * Embaralha um array usando Fisher‑Yates.
- */
-const shuffle = (array) => {
-  const copy = [...array];
-  for (let i = copy.length - 1; i > 0; i--) {
+import { classificarGrupo } from './scoring.js';
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return copy;
-};
+  return a;
+}
 
-/**
- * Calcula a próxima potência de 2 maior ou igual a n.
- */
-const nextPowerOfTwo = (n) => {
-  return 2 ** Math.ceil(Math.log2(n));
-};
+function nextPowerOfTwo(n) {
+  let p = 1;
+  while (p < n) p *= 2;
+  return p;
+}
 
-/**
- * gerarBracketMataMata(times)
- *   - times: array de objetos { id, nome, cor }
- *   - retorna array de jogos a serem criados (não persiste).
- * Cada jogo contém: { id: <generated>, esporteId, fase, round, timeAId, timeBId, status, proximoJogoId, slot }
- */
-export const gerarBracketMataMata = (times) => {
-  const shuffled = shuffle(times);
-  const totalTimes = shuffled.length;
-  const size = nextPowerOfTwo(totalTimes);
-  const byes = size - totalTimes;
-  // Preenche pores com null (byes) no fim do array
-  const padded = [...shuffled, ...Array(byes).fill(null)];
-  const rounds = Math.log2(size);
-  const jogos = [];
+function genId(prefix = 'jogo') {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}_${Math.random().toString(36).slice(2, 6)}`;
+}
 
-  // Primeiro round (round 1)
-  for (let i = 0; i < size / 2; i++) {
-    const timeA = padded[i];
-    const timeB = padded[size - 1 - i];
-    const jogo = {
-      id: `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${i}`,
-      fase: "mata-mata",
-      round: 1,
-      timeAId: timeA?.id ?? null,
-      timeBId: timeB?.id ?? null,
-      status: "pendente",
-      proximoJogoId: null,
-      slot: null,
-    };
-    jogos.push(jogo);
+function jogoBase(esporteId, fase, ordem, extras = {}) {
+  return {
+    id: genId('jogo'),
+    esporteId,
+    timeAId: null,
+    timeBId: null,
+    status: 'agendado',
+    fase,
+    eventos: [],
+    pontosTimeA: 0,
+    pontosTimeB: 0,
+    vencedor: null,
+    proximoJogoId: null,
+    slot: null,
+    ordem,
+    ...extras,
+  };
+}
+
+// =========== MATA-MATA DIRETO (1v1) ===========
+export function gerarBracketMataMata(esporteId, times) {
+  if (!times || times.length < 2) return [];
+  const embaralhados = shuffle(times);
+  return montarBracketComSeeds(esporteId, embaralhados.map((t) => t.id));
+}
+
+// Monta um bracket com seeds ja definidos (pareamento alto vs baixo).
+// `slots` e array de timeIds com `null` representando byes.
+function montarBracketComSeeds(esporteId, seeds, ordemBase = 1) {
+  const tamanho = nextPowerOfTwo(seeds.length);
+  const slots = [...seeds];
+  while (slots.length < tamanho) slots.push(null);
+
+  const totalRodadas = Math.log2(tamanho);
+  const jogosPorRodada = [];
+  let ordem = ordemBase;
+
+  // Rodada 0: pareamento "alto x baixo" classico (slots[i] vs slots[size-1-i])
+  const r0 = [];
+  for (let i = 0; i < slots.length / 2; i++) {
+    r0.push(
+      jogoBase(esporteId, 'mata-mata', ordem++, {
+        timeAId: slots[i],
+        timeBId: slots[slots.length - 1 - i],
+      })
+    );
   }
+  jogosPorRodada.push(r0);
 
-  // Cria placeholders para rounds subsequentes (sem times ainda)
-  for (let r = 2; r <= rounds; r++) {
-    const numGames = size / (2 ** r);
-    for (let i = 0; i < numGames; i++) {
-      const jogo = {
-        id: `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${r}_${i}`,
-        fase: "mata-mata",
-        round: r,
-        timeAId: null,
-        timeBId: null,
-        status: "pendente",
-        proximoJogoId: null,
-        slot: null,
-      };
-      jogos.push(jogo);
+  // Rodadas seguintes: jogos vazios encadeados
+  for (let r = 1; r < totalRodadas; r++) {
+    const prev = jogosPorRodada[r - 1];
+    const curr = [];
+    for (let i = 0; i < prev.length; i += 2) {
+      const novo = jogoBase(esporteId, 'mata-mata', ordem++);
+      curr.push(novo);
+      prev[i].proximoJogoId = novo.id;
+      prev[i].slot = 'A';
+      prev[i + 1].proximoJogoId = novo.id;
+      prev[i + 1].slot = 'B';
     }
+    jogosPorRodada.push(curr);
   }
 
-  // Encadeia jogos: o vencedor de cada jogo do round r vai para slot A ou B do jogo correspondente no round r+1
-  const roundGames = {};
+  return resolverByes(jogosPorRodada.flat());
+}
+
+// Resolve byes em cascata: jogos onde um lado eh null e o outro nao
+// E que nao tem outro jogo alimentando o slot vazio sao marcados como finalizados
+// automaticamente, propagando o vencedor pro proximo jogo.
+function resolverByes(jogos) {
+  const porId = new Map(jogos.map((j) => [j.id, j]));
+  const alimentadores = new Map(); // id do jogo -> [ids dos predecessores]
   jogos.forEach((j) => {
-    roundGames[`r${j.round}`] = roundGames[`r${j.round}`] || [];
-    roundGames[`r${j.round}`].push(j);
-  });
-
-  for (let r = 1; r < rounds; r++) {
-    const current = roundGames[`r${r}`];
-    const next = roundGames[`r${r + 1}`];
-    current.forEach((game, idx) => {
-      const targetIdx = Math.floor(idx / 2);
-      const slot = idx % 2 === 0 ? "A" : "B";
-      game.proximoJogoId = next[targetIdx].id;
-      game.slot = slot;
-    });
-  }
-
-  // Byes avançam automaticamente – se um time estiver contra null, coloca o vencedor no próximo game
-  jogos.forEach((game) => {
-    if (game.timeAId && !game.timeBId) {
-      // A avança
-      if (game.proximoJogoId) {
-        const nextGame = jogos.find((g) => g.id === game.proximoJogoId);
-        if (nextGame) {
-          nextGame[game.slot === "A" ? "timeAId" : "timeBId"] = game.timeAId;
-        }
-      }
-    } else if (!game.timeAId && game.timeBId) {
-      // B avança
-      if (game.proximoJogoId) {
-        const nextGame = jogos.find((g) => g.id === game.proximoJogoId);
-        if (nextGame) {
-          nextGame[game.slot === "A" ? "timeAId" : "timeBId"] = game.timeBId;
-        }
-      }
+    if (j.proximoJogoId) {
+      const lista = alimentadores.get(j.proximoJogoId) || [];
+      lista.push(j.id);
+      alimentadores.set(j.proximoJogoId, lista);
     }
   });
 
+  let mudou = true;
+  while (mudou) {
+    mudou = false;
+    for (const j of jogos) {
+      if (j.status !== 'agendado') continue;
+      const aVazio = !j.timeAId;
+      const bVazio = !j.timeBId;
+      if (!aVazio && !bVazio) continue;
+      if (aVazio && bVazio) continue;
+
+      // Se ha algum predecessor que ainda pode mandar um time pra esse jogo,
+      // espera. So resolve bye se todos os predecessores ja finalizaram.
+      const preds = alimentadores.get(j.id) || [];
+      const algumPendente = preds.some((pid) => {
+        const p = porId.get(pid);
+        return p && p.status !== 'finalizado';
+      });
+      if (algumPendente) continue;
+
+      const vencedor = aVazio ? j.timeBId : j.timeAId;
+      if (!vencedor) continue;
+      j.status = 'finalizado';
+      j.vencedor = vencedor;
+      j.bye = true;
+      if (j.proximoJogoId) {
+        const prox = porId.get(j.proximoJogoId);
+        if (prox) {
+          if (j.slot === 'A') prox.timeAId = vencedor;
+          else prox.timeBId = vencedor;
+        }
+      }
+      mudou = true;
+    }
+  }
   return jogos;
-};
+}
 
-/**
- * gerarFaseGrupos(times, numGrupos)
- *   - Distribui times em grupos após shuffle.
- *   - Gera todos os confrontos round‑robin dentro de cada grupo.
- * Retorna objeto { grupos: [{ id, times: [] }], jogos: [] }
- */
-export const gerarFaseGrupos = (times, numGrupos) => {
-  const shuffled = shuffle(times);
-  const groups = [];
-  const perGroup = Math.ceil(shuffled.length / numGrupos);
-  for (let i = 0; i < numGrupos; i++) {
-    groups.push({
-      id: `grupo_${i + 1}`,
-      times: shuffled.slice(i * perGroup, (i + 1) * perGroup),
-    });
-  }
+// =========== FASE DE GRUPOS (1v1) ===========
+// Distribui times nos grupos sequencialmente apos shuffle.
+// Gera todos os confrontos round-robin de cada grupo.
+// Retorna { jogos, composicao }, onde composicao eh persistida em
+// esporte.config.grupos pra ser usada no chaveamento.
+export function gerarFaseGrupos(esporteId, times, numGrupos) {
+  const embaralhados = shuffle(times);
+  const grupos = Array.from({ length: numGrupos }, () => []);
+  embaralhados.forEach((t, i) => grupos[i % numGrupos].push(t));
+
   const jogos = [];
-  groups.forEach((g) => {
-    const ts = g.times;
-    for (let a = 0; a < ts.length; a++) {
-      for (let b = a + 1; b < ts.length; b++) {
-        const jogo = {
-          id: `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${g.id}_${ts[a].id}_${ts[b].id}`,
-          fase: "grupos",
-          grupoId: g.id,
-          timeAId: ts[a].id,
-          timeBId: ts[b].id,
-          status: "pendente",
-          proximoJogoId: null,
-          slot: null,
-        };
-        jogos.push(jogo);
+  let ordem = 1;
+  grupos.forEach((timesDoGrupo, gIdx) => {
+    const grupoId = `G${gIdx + 1}`;
+    for (let i = 0; i < timesDoGrupo.length; i++) {
+      for (let j = i + 1; j < timesDoGrupo.length; j++) {
+        jogos.push(
+          jogoBase(esporteId, 'grupos', ordem++, {
+            grupoId,
+            timeAId: timesDoGrupo[i].id,
+            timeBId: timesDoGrupo[j].id,
+          })
+        );
       }
     }
   });
-  return { grupos, jogos };
-};
 
-/**
- * gerarMataMataPosGrupos(grupos, classificadosPorGrupo, regras, esporteId)
- *   - grupos: array de objetos { id, times }
- *   - classificadosPorGrupo: { [grupoId]: [timeId] } (ordenado por classificação)
- *   - regras: objeto de regras do esporte (usado apenas para persistência)
- *   - retorna array de jogos de mata‑mata já encadeados.
- */
-export const gerarMataMataPosGrupos = (grupos, classificadosPorGrupo, esporteId) => {
-  // Cross‑seed: 1ºA x 2ºB, 1ºB x 2ºA etc.
-  const seeds = [];
-  const gruposArr = grupos.map((g) => ({
-    id: g.id,
-    classificados: classificadosPorGrupo[g.id] || [],
+  const composicao = grupos.map((g, i) => ({
+    grupoId: `G${i + 1}`,
+    timeIds: g.map((t) => t.id),
   }));
 
-  // Assume dois grupos para simplificar; se houver mais, faz pareamento em ordem
-  if (gruposArr.length !== 2) {
-    console.warn("gerarMataMataPosGrupos espera exatamente 2 grupos");
-  }
-  const [gA, gB] = gruposArr;
-  const minLen = Math.min(gA.classificados.length, gB.classificados.length);
-  for (let i = 0; i < minLen; i++) {
-    const timeA = i % 2 === 0 ? gA.classificados[i / 2] : gB.classificados[Math.floor(i / 2)];
-    const timeB = i % 2 === 0 ? gB.classificados[i / 2] : gA.classificados[Math.floor(i / 2)];
-    seeds.push({ timeAId: timeA, timeBId: timeB });
-  }
-  // Usa gerarBracketMataMata sobre os times seed
-  const seedTimes = seeds.map((s, idx) => ({ id: `seed_${idx}`, ...s }));
-  // Para compatibilidade, vamos criar jogos usando gerarBracketMataMata e depois substituir os ids
-  const bracket = gerarBracketMataMata(seedTimes);
-  // Substitui os placeholders de timeAId/BId pelos verdadeiros
-  bracket.forEach((j) => {
-    if (j.timeAId && j.timeAId.startsWith("seed_")) {
-      const seed = seeds[parseInt(j.timeAId.split("_")[1], 10)];
-      j.timeAId = seed.timeAId;
-    }
-    if (j.timeBId && j.timeBId.startsWith("seed_")) {
-      const seed = seeds[parseInt(j.timeBId.split("_")[1], 10)];
-      j.timeBId = seed.timeBId;
-    }
-    j.esporteId = esporteId;
-    j.fase = "mata-mata";
-  });
-  return bracket;
-};
+  return { jogos, composicao };
+}
 
-/**
- * gerarRodadasColetivo(times, numRodadas)
- *   - Para esportes coletivos (não‑1v1).
- *   - Em cada rodada, embaralha os times. Se número ímpar, escolhe aleatoriamente um time que jogará duas vezes.
- *   - Retorna array de jogos.
- */
-export const gerarRodadasColetivo = (times, numRodadas) => {
+// Apos finalizar todos os jogos da fase de grupos, monta o mata-mata
+// com os top-N classificados de cada grupo (seeding cruzado).
+export function gerarMataMataPosGrupos({ esporteId, esporteConfig, times, jogos }) {
+  const composicao = esporteConfig?.grupos || [];
+  const timesQueAvancam = esporteConfig?.timesQueAvancam || 1;
+  const timesPorId = new Map(times.map((t) => [t.id, t]));
+
+  // Top-N de cada grupo
+  const classificadosPorGrupo = composicao.map(({ grupoId, timeIds }) => {
+    const timesDoGrupo = timeIds.map((id) => timesPorId.get(id)).filter(Boolean);
+    const jogosDoGrupo = jogos.filter(
+      (j) => j.esporteId === esporteId && j.fase === 'grupos' && j.grupoId === grupoId
+    );
+    const ranking = classificarGrupo(timesDoGrupo, jogosDoGrupo, esporteId);
+    return {
+      grupoId,
+      top: ranking.slice(0, timesQueAvancam).map((r) => r.time),
+    };
+  });
+
+  // Lista de classificados em ordem de seed (pos 1 de todos, depois pos 2, etc.)
+  const seeds = [];
+  for (let pos = 0; pos < timesQueAvancam; pos++) {
+    for (const g of classificadosPorGrupo) {
+      if (g.top[pos]) seeds.push(g.top[pos].id);
+    }
+  }
+  if (seeds.length < 2) return [];
+
+  // Pareamento cruzado: seeds[0] vs seeds[N-1], seeds[1] vs seeds[N-2], etc.
+  // (que e o que `montarBracketComSeeds` ja faz quando recebe na ordem 1..N)
+  // Comeca com ordem 1000 pra ficar depois dos jogos de grupo na visualizacao.
+  return montarBracketComSeeds(esporteId, seeds, 1000);
+}
+
+// =========== COLETIVO (rodadas) ===========
+// Pra cada rodada: embaralha e pareia. Se nº ímpar, sorteia UM time pra jogar 2x
+// (aparece duas vezes no pool da rodada). Total de jogos na rodada = ceil(N/2).
+export function gerarRodadasColetivo(esporteId, times, numRodadas) {
+  if (!times || times.length < 2) return [];
   const jogos = [];
+  let ordem = 1;
   for (let r = 1; r <= numRodadas; r++) {
-    const shuffled = shuffle(times);
-    let extra = null;
-    if (shuffled.length % 2 === 1) {
-      const idx = Math.floor(Math.random() * shuffled.length);
-      extra = shuffled.splice(idx, 1)[0];
+    const fase = `rodada-${r}`;
+    let pool = shuffle(times);
+
+    // Se ímpar, escolhe um time pra duplicar nessa rodada
+    if (pool.length % 2 === 1) {
+      const dobradoIdx = Math.floor(Math.random() * pool.length);
+      const dobrado = pool[dobradoIdx];
+      pool = shuffle([...pool, dobrado]);
+      // Garante que o time dobrado nao apareca nos dois lados do mesmo jogo:
+      // se dois `dobrado` ficarem em posicoes consecutivas pares, embaralha de novo
+      let tentativas = 0;
+      while (tentativas < 10) {
+        let conflito = false;
+        for (let i = 0; i < pool.length; i += 2) {
+          if (pool[i].id === pool[i + 1].id) {
+            conflito = true;
+            break;
+          }
+        }
+        if (!conflito) break;
+        pool = shuffle(pool);
+        tentativas++;
+      }
     }
-    for (let i = 0; i < shuffled.length; i += 2) {
-      const jogo = {
-        id: `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${r}_${i / 2}`,
-        fase: "coletivo",
-        rodada: r,
-        timeAId: shuffled[i].id,
-        timeBId: shuffled[i + 1].id,
-        status: "pendente",
-        proximoJogoId: null,
-        slot: null,
-      };
-      jogos.push(jogo);
-    }
-    if (extra) {
-      // Cria dois jogos onde o extra aparece duas vezes contra dois adversários aleatórios
-      const opponents = shuffle(times.filter((t) => t.id !== extra.id)).slice(0, 2);
-      opponents.forEach((opp, idx) => {
-        const jogo = {
-          id: `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${r}_extra_${idx}`,
-          fase: "coletivo",
-          rodada: r,
-          timeAId: extra.id,
-          timeBId: opp.id,
-          status: "pendente",
-          proximoJogoId: null,
-          slot: null,
-        };
-        jogos.push(jogo);
-      });
+
+    for (let i = 0; i < pool.length; i += 2) {
+      jogos.push(
+        jogoBase(esporteId, fase, ordem++, {
+          timeAId: pool[i].id,
+          timeBId: pool[i + 1].id,
+        })
+      );
     }
   }
   return jogos;
-};
-
-/**
- * avancarBracket(jogo)
- *   - jogo: objeto completo já carregado do Firestore.
- *   - Atualiza o próximo jogo (se houver) colocando o vencedor no slot correto.
- *   - Não persiste; usado dentro de um writeBatch na camada de serviço.
- */
-export const avancarBracket = (jogo, vencedorId) => {
-  if (!jogo.proximoJogoId || !vencedorId) return null;
-  const campoSlot = jogo.slot === "A" ? "timeAId" : "timeBId";
-  return { proximoJogoId: jogo.proximoJogoId, campoSlot, vencedorId };
-};
-
-/**
- * Helper para gerar um ID de jogo único (para uso interno, não confiável como chave primária em produção).
- */
-export const gerarIdJogo = () => `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${Math.random().toString(36).substr(2, 5)}`;
-
+}

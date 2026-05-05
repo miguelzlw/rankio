@@ -10,10 +10,10 @@ export default function GrupoTable({ grupoId, timeIds, esporteId, jogos, times }
   const ranking = classificarGrupo(timesDoGrupo, jogosDoGrupo, esporteId);
 
   return (
-    <div className="bg-white rounded-xl p-3 shadow-sm">
-      <h3 className="font-semibold text-sm mb-2">Grupo {grupoId.replace('G', '')}</h3>
+    <div className="bg-surface/50 rounded-xl p-3 border border-white/10">
+      <h3 className="font-semibold text-sm mb-2 text-text">Grupo {grupoId.replace('G', '')}</h3>
       <table className="w-full text-sm">
-        <thead className="text-xs text-slate-500">
+        <thead className="text-xs text-slate-400">
           <tr>
             <th className="text-left font-normal w-6">#</th>
             <th className="text-left font-normal">Time</th>
@@ -23,13 +23,13 @@ export default function GrupoTable({ grupoId, timeIds, esporteId, jogos, times }
         </thead>
         <tbody>
           {ranking.map((r, i) => (
-            <tr key={r.time.id} className="border-t border-slate-100">
+            <tr key={r.time.id} className="border-t border-white/5">
               <td className="py-1 text-slate-400">{i + 1}º</td>
               <td className="py-1">
                 <TimeChip time={r.time} size="sm" />
               </td>
-              <td className="py-1 text-right tabular-nums font-semibold">{r.pontos}</td>
-              <td className="py-1 text-right tabular-nums text-slate-500">
+              <td className="py-1 text-right tabular-nums font-semibold text-text">{r.pontos}</td>
+              <td className="py-1 text-right tabular-nums text-slate-400">
                 {r.saldo > 0 ? '+' : ''}
                 {r.saldo}
               </td>
@@ -39,8 +39,8 @@ export default function GrupoTable({ grupoId, timeIds, esporteId, jogos, times }
       </table>
 
       {jogosDoGrupo.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-slate-100">
-          <p className="text-xs font-medium text-slate-500 mb-1">Jogos do grupo</p>
+        <div className="mt-3 pt-3 border-t border-white/10">
+          <p className="text-xs font-medium text-slate-400 mb-1">Jogos do grupo</p>
           <ul className="space-y-1">
             {jogosDoGrupo.map((j) => {
               const a = timesPorId.get(j.timeAId);
@@ -48,7 +48,7 @@ export default function GrupoTable({ grupoId, timeIds, esporteId, jogos, times }
               return (
                 <li key={j.id} className="flex items-center gap-2 text-xs">
                   <TimeChip time={a} size="sm" />
-                  <span className="tabular-nums text-slate-600 mx-1">
+                  <span className="tabular-nums text-slate-300 mx-1">
                     {j.status === 'finalizado'
                       ? `${j.pontosTimeA} × ${j.pontosTimeB}`
                       : '—'}

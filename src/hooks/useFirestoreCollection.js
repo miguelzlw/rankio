@@ -2,55 +2,40 @@ import { useEffect, useState } from 'react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '../services/firebase.js';
 
+// Cache global modulo-scoped: ao remontar componentes (navegar entre telas)
+// nao precisamos zerar o estado e mostrar loading enquanto o snapshot chega.
 const cache = {};
 
-// Hook generico que escuta uma colecao e retorna { data, loading, error }.
-export default function useFirestoreCollection(nome, opcoes = {}) {
-  // Inicializa com o cache se existir, senao array vazio. Se tem cache, não precisa de loading inicial bloqueante.
+// Hook generico que escuta uma colecao do Firestore.
+// `orderByField` e string (ou undefined). Eh extraido como argumento direto
+// pra evitar instabilidade de objeto literal nas dependencias.
+export default function useFirestoreCollection(nome, orderByField) {
   const [data, setData] = useState(cache[nome] || []);
   const [loading, setLoading] = useState(!cache[nome]);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!cache[nome]) {
-      setLoading(true);
-    }
     setError(null);
-
-    // Timeout de fallback caso o Firebase não consiga conectar
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      if (!cache[nome]) {
-        setError(new Error('Tempo limite de conexão excedido. Verifique sua internet ou a configuração do Firebase.'));
-      }
-    }, 5000);
-
-    const ref = opcoes.orderBy
-      ? query(collection(db, nome), orderBy(opcoes.orderBy))
+    const ref = orderByField
+      ? query(collection(db, nome), orderBy(orderByField))
       : collection(db, nome);
-      
+
     const unsub = onSnapshot(
       ref,
       (snap) => {
-        clearTimeout(timeoutId);
         const docs = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
-        cache[nome] = docs; // Atualiza o cache global
+        cache[nome] = docs;
         setData(docs);
         setLoading(false);
       },
       (err) => {
-        clearTimeout(timeoutId);
-        console.error("Firebase error na coleção", nome, err);
+        console.error('Firestore error em', nome, err);
         setError(err);
         setLoading(false);
       }
     );
-    
-    return () => {
-      clearTimeout(timeoutId);
-      unsub();
-    };
-  }, [nome, opcoes.orderBy]);
+    return () => unsub();
+  }, [nome, orderByField]);
 
   return { data, loading, error };
 }

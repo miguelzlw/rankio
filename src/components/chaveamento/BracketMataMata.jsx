@@ -66,13 +66,13 @@ function JogoBracket({ jogo, timesPorId }) {
   const b = timesPorId.get(jogo.timeBId);
   const fim = jogo.status === 'finalizado';
   return (
-    <div className="bg-white rounded-lg border border-slate-200 p-2 text-xs">
+    <div className="bg-surface/50 rounded-lg border border-white/10 p-2 text-xs">
       <Linha
         time={a}
         pontos={fim ? jogo.pontosTimeA : null}
         vencedor={fim && jogo.vencedor === jogo.timeAId}
       />
-      <div className="border-t border-slate-100 my-1" />
+      <div className="border-t border-white/10 my-1" />
       <Linha
         time={b}
         pontos={fim ? jogo.pontosTimeB : null}
@@ -87,7 +87,7 @@ function Linha({ time, pontos, vencedor }) {
     <div className={`flex items-center gap-2 ${vencedor ? 'font-semibold' : ''}`}>
       <TimeChip time={time} size="sm" placeholder="—" />
       {pontos !== null && pontos !== undefined && (
-        <span className="ml-auto tabular-nums text-slate-700">{pontos}</span>
+        <span className="ml-auto tabular-nums text-text">{pontos}</span>
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import { useTimes, useEsportes } from '../hooks/useDados.js';
 import TimesManager from '../components/configuracao/TimesManager.jsx';
 import EsportesManager from '../components/configuracao/EsportesManager.jsx';
 import JogosManager from '../components/configuracao/JogosManager.jsx';
+import BackupSection from '../components/configuracao/BackupSection.jsx';
 import { CheckCircle2 } from 'lucide-react';
 
 export default function Configuracao() {
@@ -57,6 +58,8 @@ export default function Configuracao() {
 
       {/* Mostra jogos só depois que tiver esportes */}
       {temTimes && temEsportes && <JogosManager />}
+
+      <BackupSection />
     </div>
   );
 }

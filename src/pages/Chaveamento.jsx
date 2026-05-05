@@ -45,7 +45,7 @@ export default function Chaveamento() {
       <select
         value={esporte?.id ?? ''}
         onChange={(e) => navigate(`/chaveamento/${e.target.value}`)}
-        className="w-full border border-slate-600 bg-slate-800 text-white rounded-lg px-3 py-2 mb-4"
+        className="w-full border border-white/20 bg-surface text-text rounded-lg px-3 py-2 mb-4 focus:outline-none focus:border-accent"
       >
         {esportes.map((e) => (
           <option key={e.id} value={e.id}>{e.nome}</option>

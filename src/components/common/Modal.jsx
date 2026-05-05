@@ -1,35 +1,56 @@
-// src/components/common/Modal.jsx
-import React from "react";
+import { useEffect } from 'react';
+import { X } from 'lucide-react';
 
-/**
- * Modal genérico com backdrop de vidro (glass) e animação.
- * Recebe `open`, `onClose` e `children`.
- */
-export default function Modal({ open, onClose, title, children, footer }) {
+// Modal com backdrop, X opcional, suporte a ESC e bloqueio de scroll do body.
+// Use dismissable={false} pra modais que nao podem ser fechados pelo usuario
+// (ex: contagem regressiva de reset).
+export default function Modal({ open, onClose, title, children, footer, dismissable = true }) {
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (e.key === 'Escape' && dismissable) onClose?.();
+    };
+    document.addEventListener('keydown', handler);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handler);
+      document.body.style.overflow = '';
+    };
+  }, [open, onClose, dismissable]);
+
   if (!open) return null;
+
   return (
-    <div 
-      className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-60 backdrop-blur-sm"
-      onClick={onClose}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={dismissable ? onClose : undefined}
     >
-      <div 
-        className="bg-surface glass p-6 rounded-xl w-full max-w-md mx-4 shadow-xl animate-fade-in max-h-[90vh] overflow-y-auto"
+      <div
+        className="bg-surface text-text rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col border border-white/10"
         onClick={(e) => e.stopPropagation()}
       >
-        {title && <h2 className="text-xl font-semibold mb-4 text-primary">{title}</h2>}
-        <div className="mb-4">{children}</div>
-        <div className="flex justify-end space-x-2 mt-6">
-          {footer ? (
-            footer
-          ) : (
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 text-white transition"
-            >
-              Fechar
-            </button>
-          )}
-        </div>
+        {(title || dismissable) && (
+          <div className="flex items-center justify-between p-4 border-b border-white/10">
+            {title ? (
+              <h2 className="font-semibold text-text">{title}</h2>
+            ) : (
+              <span />
+            )}
+            {dismissable && (
+              <button
+                onClick={onClose}
+                className="text-slate-400 hover:text-text p-1 transition"
+                aria-label="Fechar"
+              >
+                <X size={20} />
+              </button>
+            )}
+          </div>
+        )}
+        <div className="flex-1 overflow-auto p-4">{children}</div>
+        {footer && (
+          <div className="p-4 border-t border-white/10 flex gap-2 justify-end">{footer}</div>
+        )}
       </div>
     </div>
   );

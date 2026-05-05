@@ -95,13 +95,13 @@ export default function JogoDetalhe() {
     <div>
       <button
         onClick={() => navigate(-1)}
-        className="text-slate-600 hover:text-slate-900 inline-flex items-center gap-1 text-sm mb-2"
+        className="text-slate-400 hover:text-text inline-flex items-center gap-1 text-sm mb-2 transition"
       >
         <ArrowLeft size={16} /> Voltar
       </button>
 
-      <div className="flex items-center justify-between mb-2">
-        <h1 className="text-xl font-bold">{esporte.nome} — Jogo {jogo.ordem}</h1>
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <h1 className="text-xl font-bold truncate">{esporte.nome} — Jogo {jogo.ordem}</h1>
         <Badge status={jogo.status} />
       </div>
 
@@ -161,16 +161,18 @@ export default function JogoDetalhe() {
         <>
           <section className="grid grid-cols-2 gap-2 mb-4">
             <div>
-              <p className="text-xs text-slate-500 mb-1 font-medium">{timeA?.nome ?? 'Time A'}</p>
+              <p className="text-xs text-slate-400 mb-1 font-medium truncate">
+                {timeA?.nome ?? 'Time A'}
+              </p>
               <div className="space-y-1">
                 {esporte.regras.map((r) => (
                   <button
                     key={r.id}
                     onClick={() => handleEvento(r, 'A')}
-                    className="w-full text-left bg-white hover:bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm transition active:scale-95"
+                    className="w-full text-left bg-surface/60 hover:bg-surface border border-white/10 hover:border-accent/40 text-text rounded-lg px-3 py-2 text-sm transition active:scale-95"
                   >
                     <span className="font-medium">{r.nome}</span>
-                    <span className="text-xs text-slate-500 ml-2">
+                    <span className="text-xs text-slate-400 ml-2">
                       ({r.pontosACausa > 0 ? '+' : ''}{r.pontosACausa})
                     </span>
                   </button>
@@ -178,16 +180,18 @@ export default function JogoDetalhe() {
               </div>
             </div>
             <div>
-              <p className="text-xs text-slate-500 mb-1 font-medium">{timeB?.nome ?? 'Time B'}</p>
+              <p className="text-xs text-slate-400 mb-1 font-medium truncate">
+                {timeB?.nome ?? 'Time B'}
+              </p>
               <div className="space-y-1">
                 {esporte.regras.map((r) => (
                   <button
                     key={r.id}
                     onClick={() => handleEvento(r, 'B')}
-                    className="w-full text-left bg-white hover:bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm transition active:scale-95"
+                    className="w-full text-left bg-surface/60 hover:bg-surface border border-white/10 hover:border-accent/40 text-text rounded-lg px-3 py-2 text-sm transition active:scale-95"
                   >
                     <span className="font-medium">{r.nome}</span>
-                    <span className="text-xs text-slate-500 ml-2">
+                    <span className="text-xs text-slate-400 ml-2">
                       ({r.pontosACausa > 0 ? '+' : ''}{r.pontosACausa})
                     </span>
                   </button>
@@ -206,7 +210,7 @@ export default function JogoDetalhe() {
                   return (
                     <li
                       key={ev.id}
-                      className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 text-sm"
+                      className="flex items-center gap-2 bg-surface/50 border border-white/10 text-text rounded-lg px-3 py-2 text-sm"
                     >
                       <span className="text-xs text-slate-400 tabular-nums w-12">
                         {formatarTempo(ev.timestampCronometro || 0)}
@@ -251,9 +255,9 @@ export default function JogoDetalhe() {
 
       {jogo.status === 'finalizado' && (
         <>
-          <section className="bg-white rounded-xl p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-slate-700 mb-2">Resultado</h3>
-            <p className="text-slate-700">
+          <section className="bg-surface/50 border border-white/10 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-slate-300 mb-2">Resultado</h3>
+            <p className="text-text">
               {jogo.vencedor === jogo.timeAId
                 ? `Vencedor: ${timeA?.nome}`
                 : jogo.vencedor === jogo.timeBId
@@ -261,7 +265,7 @@ export default function JogoDetalhe() {
                   : 'Empate'}
             </p>
             {jogo.bye && (
-              <p className="text-xs text-slate-500 mt-1">Avanço por bye (W.O.).</p>
+              <p className="text-xs text-slate-400 mt-1">Avanço por bye (W.O.).</p>
             )}
           </section>
 
@@ -274,7 +278,7 @@ export default function JogoDetalhe() {
                   return (
                     <li
                       key={ev.id}
-                      className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 text-sm"
+                      className="flex items-center gap-2 bg-surface/50 border border-white/10 text-text rounded-lg px-3 py-2 text-sm"
                     >
                       <span className="text-xs text-slate-400 tabular-nums w-12">
                         {formatarTempo(ev.timestampCronometro || 0)}

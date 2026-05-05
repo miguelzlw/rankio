@@ -3,6 +3,11 @@ dist
 dist-ssr
 *.local
 
+# Env
+.env
+.env.local
+.env.*.local
+
 # Editor
 .vscode
 .idea
@@ -18,8 +23,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Firebase
-firebase.config.js
-.firebaserc
+# Firebase debug
 firebase-debug.log
 .firebase

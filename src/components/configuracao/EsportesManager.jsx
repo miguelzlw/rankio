@@ -42,27 +42,35 @@ export default function EsportesManager() {
         </p>
       )}
       {esportes.length === 0 ? (
-        <p className="text-sm text-slate-500">Nenhum esporte cadastrado.</p>
+        <p className="text-sm text-slate-400">Nenhum esporte cadastrado.</p>
       ) : (
         <ul className="space-y-2">
           {esportes.map((e) => (
             <li
               key={e.id}
-              className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm"
+              className="flex items-center gap-3 bg-surface/50 border border-white/10 rounded-xl p-3 transition hover:bg-surface/70"
             >
-              <div className="flex-1">
-                <p className="font-medium">{e.nome}</p>
-                <p className="text-xs text-slate-500">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-text truncate">{e.nome}</p>
+                <p className="text-xs text-slate-400">
                   {e.tipo === '1v1' ? '1v1' : 'Coletivo'}
                   {e.formato && ' • ' + (e.formato === 'mata-mata' ? 'Mata-mata' : 'Grupos+MM')}
                   {' • '}
                   {e.timesParticipantes?.length ?? 0} times
                 </p>
               </div>
-              <button onClick={() => abrirEdicao(e)} className="text-slate-500 hover:text-slate-900 p-1">
+              <button
+                onClick={() => abrirEdicao(e)}
+                className="text-slate-400 hover:text-accent p-1 transition"
+                aria-label="Editar"
+              >
                 <Pencil size={16} />
               </button>
-              <button onClick={() => setRemovendo(e)} className="text-slate-500 hover:text-red-600 p-1">
+              <button
+                onClick={() => setRemovendo(e)}
+                className="text-slate-400 hover:text-red-400 p-1 transition"
+                aria-label="Remover"
+              >
                 <Trash2 size={16} />
               </button>
             </li>

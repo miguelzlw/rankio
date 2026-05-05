@@ -3,9 +3,47 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom utilities */
-@layer utilities {
-  .glass {
-    @apply bg-surface bg-opacity-60 backdrop-blur-xs rounded-xl shadow-lg;
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
   }
+  body {
+    @apply font-sans bg-background text-text antialiased;
+  }
+  button {
+    @apply select-none;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .glass {
+    @apply bg-surface/60 backdrop-blur-xs rounded-xl shadow-lg;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-white/15 rounded-full;
+  }
+}
+
+@keyframes flash {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.animate-flash {
+  animation: flash 350ms ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 180ms ease-out;
 }
