@@ -5,101 +5,131 @@
  */
 
 /**
- * calculaPlacarJogo(eventos, regras)
+ * calcularPlacarJogo(eventos, regras, timeAId, timeBId)
  *  - eventos: array de objetos { regraId, timeId, timestamp }
- *  - regras: objeto mapeando regraId -> { nome, pontosACausa, pontosBSofre }
+ *  - regras: array de objetos { id, nome, pontosACausa, pontosBSofre }
+ *  - timeAId, timeBId: ids dos times participantes do jogo
  * Retorna { pontosA, pontosB }
  */
-export const calcularPlacarJogo = (eventos, regras) => {
+export const calcularPlacarJogo = (eventos, regras, timeAId, timeBId) => {
   let pontosA = 0;
   let pontosB = 0;
-  eventos.forEach((ev) => {
-    const regra = regras[ev.regraId];
+
+  // Converte regras em mapa para lookup rápido
+  const regrasMap = {};
+  if (Array.isArray(regras)) {
+    regras.forEach((r) => { regrasMap[r.id] = r; });
+  } else if (regras && typeof regras === 'object') {
+    Object.assign(regrasMap, regras);
+  }
+
+  (eventos || []).forEach((ev) => {
+    const regra = regrasMap[ev.regraId];
     if (!regra) return;
-    const isTimeA = ev.timeId === ev.timeAId; // timeAId vem do jogo, mas aqui não temos, então assumimos que evento inclui timeId e que timeAId será passado via contexto
-    // Para simplificar, vamos assumir que o chamador já separou eventos por time.
-    // Aqui recebemos eventos já filtrados por time.
-    // Implementação genérica: se evento.timeId corresponde ao time A, soma pontosACausa, senao soma pontosBSofre ao outro.
-    // Mas como não temos timeAId aqui, faremos duas chamadas distintas nas camadas superiores.
+
+    if (ev.timeId === timeAId) {
+      pontosA += regra.pontosACausa || 0;
+      pontosB += regra.pontosBSofre || 0;
+    } else if (ev.timeId === timeBId) {
+      pontosB += regra.pontosACausa || 0;
+      pontosA += regra.pontosBSofre || 0;
+    }
   });
-  // Esta implementação será substituída por lógica no hook que separa eventos por time.
+
   return { pontosA, pontosB };
 };
 
 /**
+ * pontuacaoTimeNoEsporte(jogosDoEsporte, timeId)
+ *  - jogosDoEsporte: array de jogos finalizados de um esporte
+ *  - timeId: id do time
+ * Retorna número (soma de pontos que o time fez neste esporte).
+ */
+export const pontuacaoTimeNoEsporte = (jogosDoEsporte, timeId) => {
+  let total = 0;
+  (jogosDoEsporte || []).forEach((jogo) => {
+    if (jogo.status !== 'finalizado') return;
+    if (jogo.timeAId === timeId) total += jogo.pontosA || 0;
+    else if (jogo.timeBId === timeId) total += jogo.pontosB || 0;
+  });
+  return total;
+};
+
+/**
  * calcularPontuacaoTorneio(jogosFinalizados, esportes, timeId)
- *  - jogosFinalizados: array de objetos jogo com { pontosA, pontosB, timeAId, timeBId, esporteId }
- *  - esportes: mapa esporteId -> { pontuacaoPorColocacao: [10,7,5,3,1] }
- *  - timeId: id do time a ser calculado
+ *  - jogosFinalizados: array de jogos finalizados
+ *  - esportes: array de objetos esporte
+ *  - timeId: id do time
  * Retorna { total, breakdown: { [esporteId]: pontos } }
  */
 export const calcularPontuacaoTorneio = (jogosFinalizados, esportes, timeId) => {
   const breakdown = {};
   let total = 0;
-  jogosFinalizados.forEach((jogo) => {
+  (jogosFinalizados || []).forEach((jogo) => {
     const pontos =
-      jogo.timeAId === timeId ? jogo.pontosA :
-      jogo.timeBId === timeId ? jogo.pontosB :
+      jogo.timeAId === timeId ? (jogo.pontosA || 0) :
+      jogo.timeBId === timeId ? (jogo.pontosB || 0) :
       0;
-    if (pontos === 0) return;
     if (!breakdown[jogo.esporteId]) breakdown[jogo.esporteId] = 0;
     breakdown[jogo.esporteId] += pontos;
     total += pontos;
   });
-  // Se houver pontuação por colocação (ex.: ponto extra por vitória em esportes), pode ser calculado aqui.
   return { total, breakdown };
+};
+
+/**
+ * calcularRanking(times, esportes, jogos)
+ *  - times: array de objetos time
+ *  - esportes: array de objetos esporte
+ *  - jogos: array de todos os jogos
+ * Retorna array [{ time, total, breakdown }] ordenado decrescente.
+ */
+export const calcularRanking = (times, esportes, jogos) => {
+  const finalizados = (jogos || []).filter((j) => j.status === 'finalizado');
+  const ranking = (times || []).map((time) => {
+    const { total, breakdown } = calcularPontuacaoTorneio(finalizados, esportes, time.id);
+    return { time, total, breakdown };
+  });
+  ranking.sort((a, b) => b.total - a.total);
+  return ranking;
 };
 
 /**
  * classificarGrupo(timesDoGrupo, jogosFinalizadosDoGrupo, regras)
  *  - timesDoGrupo: array de objetos { id, nome }
- *  - jogosFinalizadosDoGrupo: array de jogos já finalizados (mesmo formato de scoring)
- *  - regras: objeto de regras do esporte (necessário para cálculo de saldo)
- * Retorna array de ids ordenados conforme critérios:
- *   1. Pontos no esporte
- *   2. Saldo de pontos (feitos - sofridos)
- *   3. Confronto direto (vencedor do confronto direto)
- *   4. Ordem de cadastro (mantém estabilidade)
+ *  - jogosFinalizadosDoGrupo: array de jogos finalizados do grupo
+ *  - regras: regras do esporte (não usadas diretamente aqui)
+ * Retorna array de ids ordenados: pontos desc → saldo desc → confronto direto → cadastro.
  */
 export const classificarGrupo = (timesDoGrupo, jogosFinalizadosDoGrupo, regras) => {
-  // Primeiro agregamos estatísticas por time
   const stats = {};
-  timesDoGrupo.forEach((t) => {
+  (timesDoGrupo || []).forEach((t) => {
     stats[t.id] = { pontos: 0, saldo: 0, confrontos: {} };
   });
 
-  jogosFinalizadosDoGrupo.forEach((jogo) => {
+  (jogosFinalizadosDoGrupo || []).forEach((jogo) => {
     const { timeAId, timeBId, pontosA, pontosB } = jogo;
-    // Atualiza pontos e saldo
-    stats[timeAId].pontos += pontosA;
-    stats[timeAId].saldo += pontosA - pontosB;
-    stats[timeBId].pontos += pontosB;
-    stats[timeBId].saldo += pontosB - pontosA;
+    if (!stats[timeAId] || !stats[timeBId]) return;
+    stats[timeAId].pontos += pontosA || 0;
+    stats[timeAId].saldo += (pontosA || 0) - (pontosB || 0);
+    stats[timeBId].pontos += pontosB || 0;
+    stats[timeBId].saldo += (pontosB || 0) - (pontosA || 0);
     // Confronto direto
     if (!stats[timeAId].confrontos[timeBId]) stats[timeAId].confrontos[timeBId] = 0;
     if (!stats[timeBId].confrontos[timeAId]) stats[timeBId].confrontos[timeAId] = 0;
-    if (pontosA > pontosB) stats[timeAId].confrontos[timeBId] = 1;
-    else if (pontosB > pontosA) stats[timeBId].confrontos[timeAId] = 1;
-    // empates deixam 0 (não muda). 
+    if ((pontosA || 0) > (pontosB || 0)) stats[timeAId].confrontos[timeBId] = 1;
+    else if ((pontosB || 0) > (pontosA || 0)) stats[timeBId].confrontos[timeAId] = 1;
   });
 
-  // Função comparadora
   const compare = (aId, bId) => {
     const a = stats[aId];
     const b = stats[bId];
-    // 1. Pontos
     if (a.pontos !== b.pontos) return b.pontos - a.pontos;
-    // 2. Saldo
     if (a.saldo !== b.saldo) return b.saldo - a.saldo;
-    // 3. Confronto direto
-    if (a.confrontos[bId] !== undefined && b.confrontos[aId] !== undefined) {
-      if (a.confrontos[bId] === 1) return -1;
-      if (b.confrontos[aId] === 1) return 1;
-    }
-    // 4. Ordem de cadastro (mantém a ordem original)
+    if (a.confrontos[bId] === 1) return -1;
+    if (b.confrontos[aId] === 1) return 1;
     return 0;
   };
 
-  const ordered = [...timesDoGrupo].sort((x, y) => compare(x.id, y.id)).map((t) => t.id);
-  return ordered;
+  return [...timesDoGrupo].sort((x, y) => compare(x.id, y.id)).map((t) => t.id);
 };

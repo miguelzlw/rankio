@@ -139,10 +139,40 @@ export const resetTotal = async () => {
     while (!snapshot.empty) {
       const batch = writeBatch(db);
       snapshot.docs.slice(0, batchSize).forEach((docSnap) => {
-        batch.delete(doc(col.path, docSnap.id));
+        batch.delete(doc(db, col.path, docSnap.id));
       });
       await batch.commit();
       snapshot = await getDocs(col);
     }
   }
 };
+
+// ── Aliases usados pelos componentes ──
+export const removerTime = deletarTime;
+export const removerEsporte = deletarEsporte;
+export const removerJogo = deletarJogo;
+
+/**
+ * Gera chaveamento de um esporte e persiste todos os jogos em batch.
+ * @param {string} esporteId
+ * @param {Array} jogosGerados — array de objetos jogo vindos de brackets.js
+ */
+export const gerarChaveamento = async (esporteId, jogosGerados) => {
+  const batchSize = 500;
+  for (let i = 0; i < jogosGerados.length; i += batchSize) {
+    const batch = writeBatch(db);
+    const slice = jogosGerados.slice(i, i + batchSize);
+    slice.forEach((jogo) => {
+      const ref = doc(jogosCol);
+      batch.set(ref, {
+        ...jogo,
+        esporteId,
+        eventos: [],
+        status: jogo.status || "pendente",
+        criadoEm: serverTimestamp(),
+      });
+    });
+    await batch.commit();
+  }
+};
+
