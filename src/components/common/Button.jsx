@@ -1,6 +1,5 @@
 // src/components/common/Button.jsx
 import React from "react";
-import PropTypes from "prop-types";
 
 /**
  * Botão estilizado com Tailwind.
@@ -20,11 +19,3 @@ export default function Button({ children, onClick, disabled = false, type = "bu
     </button>
   );
 }
-
-Button.propTypes = {
-  children: PropTypes.node.isRequired,
-  onClick: PropTypes.func,
-  disabled: PropTypes.bool,
-  type: PropTypes.oneOf(["button", "submit", "reset"]),
-  className: PropTypes.string,
-};

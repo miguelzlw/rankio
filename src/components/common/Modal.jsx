@@ -1,6 +1,5 @@
 // src/components/common/Modal.jsx
 import React from "react";
-import PropTypes from "prop-types";
 
 /**
  * Modal genérico com backdrop de vidro (glass) e animação.
@@ -25,10 +24,3 @@ export default function Modal({ open, onClose, title, children }) {
     </div>
   );
 }
-
-Modal.propTypes = {
-  open: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  title: PropTypes.string,
-  children: PropTypes.node.isRequired,
-};
