@@ -7,11 +7,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: "hsl(220, 90%, 55%)",
-        secondary: "hsl(340, 70%, 60%)",
-        accent: "hsl(45, 95%, 55%)",
-        background: "hsl(210, 15%, 12%)",
-        surface: "hsl(210, 15%, 18%)",
+        primary: "hsl(350, 70%, 40%)", // Bordô
+        secondary: "hsl(350, 50%, 30%)",
+        accent: "hsl(45, 95%, 55%)", // Yellow
+        background: "hsl(350, 40%, 10%)", // Dark bordô background
+        surface: "hsl(350, 40%, 16%)", // Modal surface
         text: "hsl(0, 0%, 90%)",
       },
       fontFamily: {

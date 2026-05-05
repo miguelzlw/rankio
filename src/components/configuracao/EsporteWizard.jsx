@@ -117,13 +117,13 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
         {passo === 1 && (
           <>
             <div>
-              <label className="text-sm font-medium block mb-1">Nome</label>
+              <label className="text-sm font-medium block mb-1 text-slate-300">Nome</label>
               <input
                 type="text"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 placeholder="Ex: Futsal masculino"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                className="w-full border border-white/20 bg-black/20 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent placeholder-white/30"
                 autoFocus
               />
             </div>
@@ -172,23 +172,23 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                 {formato === 'grupos-mata-mata' && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-medium block mb-1">Quantos grupos</label>
+                      <label className="text-sm font-medium block mb-1 text-slate-300">Quantos grupos</label>
                       <input
                         type="number"
                         min="1"
                         value={numGrupos}
                         onChange={(e) => setNumGrupos(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                        className="w-full border border-white/20 bg-black/20 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium block mb-1">Avançam por grupo</label>
+                      <label className="text-sm font-medium block mb-1 text-slate-300">Avançam por grupo</label>
                       <input
                         type="number"
                         min="1"
                         value={timesQueAvancam}
                         onChange={(e) => setTimesQueAvancam(e.target.value)}
-                        className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                        className="w-full border border-white/20 bg-black/20 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                       />
                     </div>
                   </div>
@@ -196,13 +196,13 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
               </>
             ) : (
               <div>
-                <label className="text-sm font-medium block mb-1">Quantas rodadas</label>
+                <label className="text-sm font-medium block mb-1 text-slate-300">Quantas rodadas</label>
                 <input
                   type="number"
                   min="1"
                   value={numRodadas}
                   onChange={(e) => setNumRodadas(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2"
+                  className="w-full border border-white/20 bg-black/20 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 />
               </div>
             )}
@@ -227,7 +227,7 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                       setRegras(novas);
                     }}
                     placeholder="Nome"
-                    className="flex-1 min-w-0 border border-slate-300 rounded-lg px-2 py-1 text-sm"
+                    className="flex-1 min-w-0 border border-white/20 bg-black/20 text-white rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent placeholder-white/30"
                   />
                   <input
                     type="number"
@@ -238,7 +238,7 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                       setRegras(novas);
                     }}
                     title="Pontos pra quem causa"
-                    className="w-16 border border-slate-300 rounded-lg px-2 py-1 text-sm tabular-nums"
+                    className="w-16 border border-white/20 bg-black/20 text-white rounded-lg px-2 py-1 text-sm tabular-nums focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                   />
                   <input
                     type="number"
@@ -249,7 +249,7 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                       setRegras(novas);
                     }}
                     title="Pontos pra quem sofre"
-                    className="w-16 border border-slate-300 rounded-lg px-2 py-1 text-sm tabular-nums"
+                    className="w-16 border border-white/20 bg-black/20 text-white rounded-lg px-2 py-1 text-sm tabular-nums focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                   />
                   <button
                     onClick={() => setRegras(regras.filter((x) => x.id !== r.id))}
@@ -283,7 +283,7 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                 const ativo = participantes.includes(t.id);
                 return (
                   <li key={t.id}>
-                    <label className="flex items-center gap-2 bg-white rounded-lg p-2 cursor-pointer hover:bg-slate-50">
+                    <label className="flex items-center gap-2 bg-black/20 border border-white/10 rounded-lg p-2 cursor-pointer hover:bg-white/5 transition">
                       <input
                         type="checkbox"
                         checked={ativo}
@@ -294,13 +294,13 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                               : [...participantes, t.id]
                           );
                         }}
-                        className="w-4 h-4"
+                        className="w-4 h-4 accent-accent"
                       />
                       <span
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: t.cor }}
                       />
-                      <span className="flex-1">{t.nome}</span>
+                      <span className="flex-1 text-slate-200">{t.nome}</span>
                     </label>
                   </li>
                 );
@@ -321,7 +321,7 @@ function TipoBtn({ ativo, children, onClick }) {
     <button
       onClick={onClick}
       className={`text-left p-3 rounded-lg border-2 transition ${
-        ativo ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+        ativo ? 'border-accent bg-accent/20 text-accent' : 'border-white/10 bg-black/20 text-slate-300 hover:border-white/30'
       }`}
     >
       {children}
@@ -334,11 +334,11 @@ function FormatoBtn({ ativo, onClick, label, desc }) {
     <button
       onClick={onClick}
       className={`w-full text-left p-3 rounded-lg border-2 transition ${
-        ativo ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+        ativo ? 'border-accent bg-accent/20 text-accent' : 'border-white/10 bg-black/20 text-slate-300 hover:border-white/30'
       }`}
     >
       <div className="font-medium">{label}</div>
-      <div className="text-xs text-slate-500 mt-0.5">{desc}</div>
+      <div className={`text-xs mt-0.5 ${ativo ? 'text-accent/80' : 'text-slate-500'}`}>{desc}</div>
     </button>
   );
 }
