@@ -1,0 +1,11 @@
+/* src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom utilities */
+@layer utilities {
+  .glass {
+    @apply bg-surface bg-opacity-60 backdrop-blur-xs rounded-xl shadow-lg;
+  }
+}
