@@ -44,7 +44,7 @@ export const gerarBracketMataMata = (times) => {
     const timeA = padded[i];
     const timeB = padded[size - 1 - i];
     const jogo = {
-      id: `jogo_${Date.now()}_${i}`,
+      id: `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${i}`,
       fase: "mata-mata",
       round: 1,
       timeAId: timeA?.id ?? null,
@@ -61,7 +61,7 @@ export const gerarBracketMataMata = (times) => {
     const numGames = size / (2 ** r);
     for (let i = 0; i < numGames; i++) {
       const jogo = {
-        id: `jogo_${Date.now()}_${r}_${i}`,
+        id: `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${r}_${i}`,
         fase: "mata-mata",
         round: r,
         timeAId: null,
@@ -138,7 +138,7 @@ export const gerarFaseGrupos = (times, numGrupos) => {
     for (let a = 0; a < ts.length; a++) {
       for (let b = a + 1; b < ts.length; b++) {
         const jogo = {
-          id: `jogo_${Date.now()}_${g.id}_${ts[a].id}_${ts[b].id}`,
+          id: `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${g.id}_${ts[a].id}_${ts[b].id}`,
           fase: "grupos",
           grupoId: g.id,
           timeAId: ts[a].id,
@@ -217,7 +217,7 @@ export const gerarRodadasColetivo = (times, numRodadas) => {
     }
     for (let i = 0; i < shuffled.length; i += 2) {
       const jogo = {
-        id: `jogo_${Date.now()}_${r}_${i / 2}`,
+        id: `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${r}_${i / 2}`,
         fase: "coletivo",
         rodada: r,
         timeAId: shuffled[i].id,
@@ -233,7 +233,7 @@ export const gerarRodadasColetivo = (times, numRodadas) => {
       const opponents = shuffle(times.filter((t) => t.id !== extra.id)).slice(0, 2);
       opponents.forEach((opp, idx) => {
         const jogo = {
-          id: `jogo_${Date.now()}_${r}_extra_${idx}`,
+          id: `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${r}_extra_${idx}`,
           fase: "coletivo",
           rodada: r,
           timeAId: extra.id,
@@ -264,5 +264,5 @@ export const avancarBracket = (jogo, vencedorId) => {
 /**
  * Helper para gerar um ID de jogo único (para uso interno, não confiável como chave primária em produção).
  */
-export const gerarIdJogo = () => `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+export const gerarIdJogo = () => `jogo_${Date.now()}_${Math.random().toString(36).substr(2, 5)}_${Math.random().toString(36).substr(2, 5)}`;
 

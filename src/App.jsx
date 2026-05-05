@@ -22,6 +22,7 @@ function App() {
           <Route path="/configuracao" element={<Configuracao />} />
           <Route path="/chaveamento" element={<Chaveamento />} />
           <Route path="/chaveamento/:esporteId" element={<Chaveamento />} />
+          <Route path="*" element={<div className="flex-1 p-8 text-center"><h1 className="text-2xl font-bold mb-4">404 - Página Não Encontrada</h1><p>A página que você está procurando não existe ou foi removida.</p></div>} />
         </Routes>
       </div>
       <BottomNav />

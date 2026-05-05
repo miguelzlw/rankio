@@ -173,8 +173,13 @@ export const finalizarJogo = async (jogo, esporte, todosOsJogos) => {
     batch.update(proximoRef, { [campoSlot]: vencedorId });
   }
 
-  await batch.commit();
-  return { ok: true };
+  try {
+    await batch.commit();
+    return { ok: true };
+  } catch (error) {
+    console.error("Erro ao finalizar jogo:", error);
+    return { ok: false, error };
+  }
 };
 
 // ═══════════════════════════════════
@@ -221,19 +226,25 @@ export const removerJogo = deletarJogo;
  */
 export const gerarChaveamento = async (esporteId, jogosGerados) => {
   const batchSize = 500;
-  for (let i = 0; i < jogosGerados.length; i += batchSize) {
-    const batch = writeBatch(db);
-    const slice = jogosGerados.slice(i, i + batchSize);
-    slice.forEach((jogo) => {
-      const ref = doc(jogosCol);
-      batch.set(ref, {
-        ...jogo,
-        esporteId,
-        eventos: [],
-        status: jogo.status || "pendente",
-        criadoEm: serverTimestamp(),
+  try {
+    for (let i = 0; i < jogosGerados.length; i += batchSize) {
+      const batch = writeBatch(db);
+      const slice = jogosGerados.slice(i, i + batchSize);
+      slice.forEach((jogo) => {
+        const ref = jogo.id ? doc(jogosCol, jogo.id) : doc(jogosCol);
+        batch.set(ref, {
+          ...jogo,
+          esporteId,
+          eventos: [],
+          status: jogo.status || "pendente",
+          criadoEm: serverTimestamp(),
+        });
       });
-    });
-    await batch.commit();
+      await batch.commit();
+    }
+    return { ok: true };
+  } catch (error) {
+    console.error("Erro ao gerar chaveamento:", error);
+    return { ok: false, error };
   }
 };
