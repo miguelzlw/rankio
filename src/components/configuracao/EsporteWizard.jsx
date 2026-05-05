@@ -61,14 +61,14 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
       };
 
       if (editando) {
-        atualizarEsporte(esporteEdicao.id, dados).catch(e => console.error(e));
+        await atualizarEsporte(esporteEdicao.id, dados);
       } else {
-        criarEsporte(dados).catch(e => console.error(e));
+        await criarEsporte(dados);
       }
       onClose();
     } catch (error) {
       console.error('Erro ao salvar esporte:', error);
-      alert('Erro ao salvar. Verifique sua conexão ou dados e tente novamente.');
+      alert('Ocorrou um erro no banco de dados. Verifique se o Firestore está ativado e tente novamente.');
     }
   }
 

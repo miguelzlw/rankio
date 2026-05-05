@@ -22,17 +22,15 @@ export default function TimesManager() {
   async function salvar() {
     if (!editando.nome.trim()) return;
     try {
-      // Salva de forma "otimista" no Firebase, sem esperar (await) para fechar a tela.
-      // O SDK do Firebase atualizará a UI imediatamente usando cache local.
       if (editando.id) {
-        atualizarTime(editando.id, { nome: editando.nome, cor: editando.cor }).catch(e => console.error(e));
+        await atualizarTime(editando.id, { nome: editando.nome, cor: editando.cor });
       } else {
-        criarTime({ nome: editando.nome, cor: editando.cor }).catch(e => console.error(e));
+        await criarTime({ nome: editando.nome, cor: editando.cor });
       }
       setEditando(null);
     } catch (error) {
       console.error('Erro ao salvar time:', error);
-      alert('Não foi possível salvar o time. Verifique sua conexão e tente novamente.');
+      alert('Ocorrou um erro no banco de dados. Verifique se o Firestore está ativado e tente novamente.');
     }
   }
 
