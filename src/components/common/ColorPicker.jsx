@@ -6,21 +6,34 @@ const PALETA = [
   '#f43f5e', '#64748b', '#1e293b', '#000000',
 ];
 
-export default function ColorPicker({ value, onChange }) {
+export default function ColorPicker({ value, onChange, usedColors = [] }) {
   return (
     <div className="grid grid-cols-10 gap-2">
-      {PALETA.map((cor) => (
-        <button
-          key={cor}
-          type="button"
-          onClick={() => onChange(cor)}
-          aria-label={`Cor ${cor}`}
-          className={`w-8 h-8 rounded-full border-2 transition ${
-            value === cor ? 'border-slate-900 scale-110' : 'border-transparent hover:scale-110'
-          }`}
-          style={{ backgroundColor: cor }}
-        />
-      ))}
+      {PALETA.map((cor) => {
+        const isUsed = usedColors.includes(cor);
+        const isSelected = value === cor;
+        
+        return (
+          <button
+            key={cor}
+            type="button"
+            onClick={() => {
+              if (!isUsed) onChange(cor);
+            }}
+            disabled={isUsed}
+            aria-label={`Cor ${cor}`}
+            title={isUsed ? 'Cor já utilizada por outro time' : 'Selecionar cor'}
+            className={`w-8 h-8 rounded-full border-2 transition ${
+              isSelected
+                ? 'border-white scale-110 shadow-lg'
+                : isUsed
+                ? 'border-transparent opacity-20 cursor-not-allowed grayscale'
+                : 'border-transparent hover:scale-110 cursor-pointer'
+            }`}
+            style={{ backgroundColor: cor }}
+          />
+        );
+      })}
     </div>
   );
 }
