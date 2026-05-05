@@ -5,9 +5,23 @@ import { Trophy, Settings, ArrowRight } from 'lucide-react';
 import Modal from '../components/common/Modal.jsx';
 
 export default function Ranking() {
-  const { ranking, esportes, times, loading } = useRanking();
+  const { ranking, esportes, times, loading, error } = useRanking();
   const [selecionado, setSelecionado] = useState(null);
   const navigate = useNavigate();
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+          <span className="text-red-500 text-2xl">⚠️</span>
+        </div>
+        <h1 className="text-xl font-bold mb-2">Erro de conexão</h1>
+        <p className="text-slate-400 text-sm">
+          Não foi possível conectar ao banco de dados. Verifique sua internet ou as variáveis de ambiente do Firebase.
+        </p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

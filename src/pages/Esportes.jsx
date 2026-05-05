@@ -3,10 +3,26 @@ import { useEsportes, useJogos, useTimes } from '../hooks/useDados.js';
 import { Trophy, Users, Gamepad2, Settings, ArrowRight } from 'lucide-react';
 
 export default function Esportes() {
-  const { data: esportes, loading: le } = useEsportes();
-  const { data: jogos, loading: lj } = useJogos();
-  const { data: times, loading: lt } = useTimes();
+  const { data: esportes, loading: le, error: ee } = useEsportes();
+  const { data: jogos, loading: lj, error: ej } = useJogos();
+  const { data: times, loading: lt, error: et } = useTimes();
   const navigate = useNavigate();
+
+  const error = ee || ej || et;
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
+          <span className="text-red-500 text-2xl">⚠️</span>
+        </div>
+        <h1 className="text-xl font-bold mb-2">Erro de conexão</h1>
+        <p className="text-slate-400 text-sm">
+          Não foi possível conectar ao banco de dados. Verifique as configurações.
+        </p>
+      </div>
+    );
+  }
 
   if (le || lj || lt) {
     return (

@@ -10,21 +10,37 @@ export default function useFirestoreCollection(nome, opcoes = {}) {
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
+
+    // Timeout de fallback caso o Firebase não consiga conectar
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setError(new Error('Tempo limite de conexão excedido. Verifique sua internet ou a configuração do Firebase.'));
+    }, 5000);
+
     const ref = opcoes.orderBy
       ? query(collection(db, nome), orderBy(opcoes.orderBy))
       : collection(db, nome);
+      
     const unsub = onSnapshot(
       ref,
       (snap) => {
+        clearTimeout(timeoutId);
         setData(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
         setLoading(false);
       },
       (err) => {
+        clearTimeout(timeoutId);
+        console.error("Firebase error na coleção", nome, err);
         setError(err);
         setLoading(false);
       }
     );
-    return unsub;
+    
+    return () => {
+      clearTimeout(timeoutId);
+      unsub();
+    };
   }, [nome, opcoes.orderBy]);
 
   return { data, loading, error };

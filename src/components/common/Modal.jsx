@@ -12,13 +12,17 @@ export default function Modal({ open, onClose, title, children }) {
       <div className="bg-surface glass p-6 rounded-xl w-full max-w-md mx-4 shadow-xl animate-fade-in">
         {title && <h2 className="text-xl font-semibold mb-4 text-primary">{title}</h2>}
         <div className="mb-4">{children}</div>
-        <div className="flex justify-end space-x-2">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded bg-gray-500 hover:bg-gray-600 text-white"
-          >
-            Cancelar
-          </button>
+        <div className="flex justify-end space-x-2 mt-6">
+          {footer ? (
+            footer
+          ) : (
+            <button
+              onClick={onClose}
+              className="px-4 py-2 rounded bg-gray-600 hover:bg-gray-500 text-white transition"
+            >
+              Fechar
+            </button>
+          )}
         </div>
       </div>
     </div>
