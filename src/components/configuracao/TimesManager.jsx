@@ -60,20 +60,36 @@ export default function TimesManager() {
       </div>
 
       {times.length === 0 ? (
-        <p className="text-sm text-slate-500">Nenhum time cadastrado.</p>
+        <p className="text-sm text-slate-400 bg-surface/30 border border-dashed border-white/10 rounded-xl p-4 text-center">
+          Nenhum time cadastrado. Clique em <strong className="text-text">Novo</strong> para começar.
+        </p>
       ) : (
         <ul className="space-y-2">
           {times.map((t) => (
-            <li key={t.id} className="flex items-center gap-3 bg-slate-800/50 border border-slate-700/30 rounded-xl p-3 transition hover:bg-slate-800/70">
+            <li
+              key={t.id}
+              className="flex items-center gap-3 bg-surface/50 border border-white/10 rounded-xl p-3 transition hover:bg-surface/70 hover:border-white/20"
+            >
               <span
-                className="w-5 h-5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: t.cor }}
+                className="w-6 h-6 rounded-lg flex-shrink-0 ring-2 ring-white/10"
+                style={{
+                  backgroundColor: t.cor,
+                  boxShadow: `0 2px 8px -2px ${t.cor}80`,
+                }}
               />
-              <span className="flex-1 font-medium text-slate-200">{t.nome}</span>
-              <button onClick={() => setEditando({ ...t })} className="text-slate-400 hover:text-blue-400 p-1 transition">
+              <span className="flex-1 font-medium text-text truncate">{t.nome}</span>
+              <button
+                onClick={() => setEditando({ ...t })}
+                className="text-slate-400 hover:text-accent p-1 transition"
+                aria-label="Editar"
+              >
                 <Pencil size={16} />
               </button>
-              <button onClick={() => setRemovendo(t)} className="text-slate-400 hover:text-red-400 p-1 transition">
+              <button
+                onClick={() => setRemovendo(t)}
+                className="text-slate-400 hover:text-red-400 p-1 transition"
+                aria-label="Remover"
+              >
                 <Trash2 size={16} />
               </button>
             </li>
@@ -100,7 +116,7 @@ export default function TimesManager() {
                 type="text"
                 value={editando.nome}
                 onChange={(e) => setEditando({ ...editando, nome: e.target.value })}
-                className="w-full border border-slate-600 bg-slate-800 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500"
+                className="w-full border border-white/20 bg-black/20 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent placeholder-white/30"
                 placeholder="Ex: Time Brasil"
                 autoFocus
               />

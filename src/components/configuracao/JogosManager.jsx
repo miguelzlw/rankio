@@ -68,7 +68,7 @@ export default function JogosManager() {
             {temJogos ? 'Regerar chaveamento' : 'Gerar chaveamento automático'}
           </Button>
           {participantesCount < 2 && (
-            <p className="text-xs text-amber-700 mb-2">
+            <p className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 mb-2">
               Esporte tem menos de 2 participantes. Edite-o primeiro.
             </p>
           )}

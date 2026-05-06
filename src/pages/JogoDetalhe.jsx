@@ -32,6 +32,8 @@ export default function JogoDetalhe() {
   const [erro, setErro] = useState(null);
   const [flashA, setFlashA] = useState(false);
   const [flashB, setFlashB] = useState(false);
+  const [vencedorManualAberto, setVencedorManualAberto] = useState(false);
+  const [processando, setProcessando] = useState(false);
 
   const esporte = esportes.find((e) => e.id === esporteId);
   const jogo = jogos.find((j) => j.id === jogoId);
@@ -85,20 +87,29 @@ export default function JogoDetalhe() {
   }
 
   async function handleVencedorRapido(timeId) {
-    // Pra esportes coletivos sem regras: define o placar simbolicamente e
-    // ja finaliza o jogo aplicando os pontos do esporte.
-    await definirVencedorManual(jogo, timeId);
-    // Recarrega o jogo do estado atual em memoria com placar atualizado
-    const jogoAtualizado = {
-      ...jogo,
-      placarTimeA: timeId === jogo.timeAId ? 1 : timeId === jogo.timeBId ? 0 : 1,
-      placarTimeB: timeId === jogo.timeBId ? 1 : timeId === jogo.timeAId ? 0 : 1,
-    };
-    const resultado = await finalizarJogo(jogoAtualizado, esporte);
-    if (resultado.ok) {
-      navigate(`/esportes/${esporteId}`);
-    } else {
-      setErro('Erro ao finalizar o jogo.');
+    // Define o placar simbolicamente (1×0 ou 0×1, ou 1×1 em empate) e finaliza
+    // o jogo aplicando pontosVencedor/Perdedor/Empate. Substitui o placar atual.
+    if (processando) return;
+    setProcessando(true);
+    try {
+      cronometro.pausar();
+      await definirVencedorManual(jogo, timeId);
+      const jogoAtualizado = {
+        ...jogo,
+        placarTimeA:
+          timeId === jogo.timeAId ? 1 : timeId === jogo.timeBId ? 0 : 1,
+        placarTimeB:
+          timeId === jogo.timeBId ? 1 : timeId === jogo.timeAId ? 0 : 1,
+      };
+      const resultado = await finalizarJogo(jogoAtualizado, esporte);
+      if (resultado.ok) {
+        navigate(`/esportes/${esporteId}`);
+      } else {
+        setErro('Erro ao finalizar o jogo.');
+      }
+    } finally {
+      setProcessando(false);
+      setVencedorManualAberto(false);
     }
   }
 
@@ -293,6 +304,15 @@ export default function JogoDetalhe() {
                   Empate em mata-mata: marque um evento desempatador antes de finalizar.
                 </p>
               )}
+
+              {/* Atalho: definir vencedor manualmente sem precisar mexer no placar */}
+              <button
+                onClick={() => setVencedorManualAberto(true)}
+                className="w-full mt-3 flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-accent border border-white/10 hover:border-accent/40 bg-surface/40 rounded-lg py-2.5 transition"
+              >
+                <Trophy size={14} />
+                Definir vencedor manualmente
+              </button>
             </>
           )}
         </>
@@ -326,10 +346,74 @@ export default function JogoDetalhe() {
         destrutivo
       />
 
+      <Modal
+        open={vencedorManualAberto}
+        onClose={() => !processando && setVencedorManualAberto(false)}
+        title="Definir vencedor manualmente"
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-400">
+            Isso vai <strong className="text-amber-400">substituir o placar</strong> e finalizar
+            o jogo. Útil quando você quer encerrar direto sem mexer em eventos.
+          </p>
+          <div className="space-y-2">
+            <BotaoVencedor
+              time={timeA}
+              fallback="Time A"
+              onClick={() => handleVencedorRapido(jogo.timeAId)}
+              disabled={!timeA || processando}
+            />
+            <BotaoVencedor
+              time={timeB}
+              fallback="Time B"
+              onClick={() => handleVencedorRapido(jogo.timeBId)}
+              disabled={!timeB || processando}
+            />
+            {!ehMataMata && (esporte.pontosEmpate ?? 0) !== 0 && (
+              <button
+                onClick={() => handleVencedorRapido(null)}
+                disabled={processando}
+                className="w-full p-3 rounded-xl border-2 border-white/10 hover:border-slate-400/60 bg-surface/60 transition active:scale-[0.99] disabled:opacity-40"
+              >
+                <div className="flex items-center justify-center gap-2 text-slate-300">
+                  <Handshake size={18} />
+                  <span className="font-medium">Empate</span>
+                </div>
+              </button>
+            )}
+          </div>
+          {processando && (
+            <p className="text-xs text-slate-500 text-center">Processando...</p>
+          )}
+        </div>
+      </Modal>
+
       <Modal open={!!erro} onClose={() => setErro(null)} title="Atenção">
         <p>{erro}</p>
       </Modal>
     </div>
+  );
+}
+
+function BotaoVencedor({ time, fallback, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full p-3 rounded-xl border-2 border-white/10 hover:border-emerald-400/60 bg-surface/60 hover:bg-emerald-500/10 transition active:scale-[0.99] disabled:opacity-40 disabled:active:scale-100"
+    >
+      <div className="flex items-center gap-3">
+        <span
+          className="w-8 h-8 rounded-lg flex-shrink-0"
+          style={{ backgroundColor: time?.cor || '#94a3b8' }}
+        />
+        <div className="flex-1 text-left">
+          <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Vencedor</p>
+          <p className="font-semibold text-text">{time?.nome ?? fallback}</p>
+        </div>
+        <Trophy size={20} className="text-accent flex-shrink-0" />
+      </div>
+    </button>
   );
 }
 
