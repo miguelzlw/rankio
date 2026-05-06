@@ -1,4 +1,3 @@
-// src/App.jsx
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Ranking from "./pages/Ranking";
@@ -12,7 +11,7 @@ import BottomNav from "./components/common/BottomNav";
 function App() {
   return (
     <div className="flex flex-col min-h-screen bg-background text-text">
-      <div className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto px-4 pt-6 pb-24">
         <Routes>
           <Route path="/" element={<Navigate to="/ranking" replace />} />
           <Route path="/ranking" element={<Ranking />} />
@@ -22,9 +21,9 @@ function App() {
           <Route path="/configuracao" element={<Configuracao />} />
           <Route path="/chaveamento" element={<Chaveamento />} />
           <Route path="/chaveamento/:esporteId" element={<Chaveamento />} />
-          <Route path="*" element={<div className="flex-1 p-8 text-center"><h1 className="text-2xl font-bold mb-4">404 - Página Não Encontrada</h1><p>A página que você está procurando não existe ou foi removida.</p></div>} />
+          <Route path="*" element={<div className="flex-1 p-8 text-center"><h1 className="text-2xl font-bold mb-4">404</h1><p className="text-slate-400">Página não encontrada.</p></div>} />
         </Routes>
-      </div>
+      </main>
       <BottomNav />
     </div>
   );

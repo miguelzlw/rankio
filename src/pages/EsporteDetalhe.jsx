@@ -1,13 +1,12 @@
-import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
 import { useEsportes, useJogos, useTimes } from '../hooks/useDados.js';
 import Badge from '../components/common/Badge.jsx';
 import TimeChip from '../components/common/TimeChip.jsx';
-import { classificarGrupo, pontuacaoTimeNoEsporte } from '../services/scoring.js';
+import BackButton from '../components/common/BackButton.jsx';
+import { pontuacaoTimeNoEsporte } from '../services/scoring.js';
 
 export default function EsporteDetalhe() {
   const { esporteId } = useParams();
-  const navigate = useNavigate();
   const { data: esportes } = useEsportes();
   const { data: jogos } = useJogos();
   const { data: times } = useTimes();
@@ -33,19 +32,20 @@ export default function EsporteDetalhe() {
     .sort((a, b) => b.pontos - a.pontos);
 
   return (
-    <div>
-      <button
-        onClick={() => navigate(-1)}
-        className="text-slate-400 hover:text-text inline-flex items-center gap-1 text-sm mb-2 transition"
-      >
-        <ArrowLeft size={16} /> Voltar
-      </button>
-      <h1 className="text-2xl font-bold mb-1">{esporte.nome}</h1>
-      <p className="text-sm text-slate-400 mb-4">
-        {esporte.tipo === '1v1' ? '1 vs 1' : 'Coletivo'}
-        {esporte.formato &&
-          ' • ' + (esporte.formato === 'mata-mata' ? 'Mata-mata' : 'Grupos + Mata-mata')}
-      </p>
+    <div className="animate-fade-in space-y-4">
+      <BackButton label="Esportes" />
+
+      <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/30 via-surface to-surface border border-white/10 p-5">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-accent/10 blur-3xl" />
+        <div className="relative">
+          <h1 className="text-2xl font-bold tracking-tight mb-1">{esporte.nome}</h1>
+          <p className="text-sm text-slate-400">
+            {esporte.tipo === '1v1' ? '1 vs 1' : 'Coletivo'}
+            {esporte.formato &&
+              ' • ' + (esporte.formato === 'mata-mata' ? 'Mata-mata' : 'Grupos + Mata-mata')}
+          </p>
+        </div>
+      </header>
 
       {classificacao.length > 0 && (
         <section className="bg-surface/50 border border-white/10 rounded-xl p-3 mb-4">

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useEsportes, useJogos, useTimes } from '../hooks/useDados.js';
-import { Trophy, Users, Gamepad2, Settings, ArrowRight } from 'lucide-react';
+import { Trophy, Users, Gamepad2, Settings, ArrowRight, ChevronRight } from 'lucide-react';
 
 export default function Esportes() {
   const { data: esportes, loading: le, error: ee } = useEsportes();
@@ -82,55 +82,83 @@ export default function Esportes() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">Esportes</h1>
+    <div className="animate-fade-in">
+      <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/30 via-surface to-surface border border-white/10 p-5 mb-5">
+        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-accent/10 blur-3xl" />
+        <div className="relative flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center">
+            <Gamepad2 size={24} className="text-accent" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Esportes</h1>
+            <p className="text-sm text-slate-400">Toque em um esporte para ver os jogos.</p>
+          </div>
+        </div>
+      </header>
 
       <ul className="space-y-3">
         {esportes.map((esp) => {
           const jogosDoEsporte = jogos.filter((j) => j.esporteId === esp.id);
           const finalizados = jogosDoEsporte.filter((j) => j.status === 'finalizado').length;
           const total = jogosDoEsporte.length;
+          const aoVivo = jogosDoEsporte.some((j) => j.status === 'ao_vivo');
+          const pct = total > 0 ? Math.round((finalizados / total) * 100) : 0;
           return (
             <li key={esp.id}>
               <Link
                 to={`/esportes/${esp.id}`}
-                className="block bg-slate-800/50 rounded-xl p-4 border border-slate-700/30 hover:border-blue-500/40 hover:bg-slate-800/70 transition active:scale-[0.98]"
+                className="group block relative overflow-hidden rounded-2xl bg-surface/60 border border-white/10 hover:border-accent/40 transition active:scale-[0.99]"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <h2 className="font-semibold text-lg">{esp.nome}</h2>
-                    <div className="flex gap-3 text-xs text-slate-400 mt-1">
-                      <span className="inline-flex items-center gap-1">
-                        {esp.tipo === '1v1' ? <Trophy size={14} /> : <Users size={14} />}
-                        {esp.tipo === '1v1' ? '1 vs 1' : 'Coletivo'}
-                      </span>
-                      {esp.formato && (
-                        <span>
-                          {esp.formato === 'mata-mata' ? 'Mata-mata' : 'Grupos + Mata-mata'}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-accent/0 group-hover:from-primary/10 group-hover:to-accent/10 transition" />
+
+                <div className="relative p-4 flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
+                    {esp.tipo === '1v1' ? (
+                      <Trophy size={20} className="text-accent" />
+                    ) : (
+                      <Users size={20} className="text-accent" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-semibold text-text truncate">{esp.nome}</h2>
+                      {aoVivo && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/40 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                          Ao vivo
                         </span>
                       )}
                     </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {esp.tipo === '1v1' ? '1 vs 1' : 'Coletivo'}
+                      {esp.formato && ' • ' + (esp.formato === 'mata-mata' ? 'Mata-mata' : 'Grupos + MM')}
+                    </p>
+
+                    {total > 0 ? (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-slate-400 tabular-nums">
+                          {finalizados}/{total}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 mt-2 italic">
+                        Nenhum jogo gerado ainda
+                      </p>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">
-                      {finalizados}/{total}
-                    </div>
-                    <div className="text-xs text-slate-500">jogos</div>
-                  </div>
+
+                  <ChevronRight
+                    size={20}
+                    className="text-slate-500 group-hover:text-accent group-hover:translate-x-0.5 transition flex-shrink-0"
+                  />
                 </div>
-                {total > 0 && (
-                  <div className="mt-3 h-1.5 bg-slate-700/50 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-emerald-500 transition-all duration-500"
-                      style={{ width: `${(finalizados / total) * 100}%` }}
-                    />
-                  </div>
-                )}
-                {total === 0 && (
-                  <p className="text-xs text-slate-500 mt-3">
-                    Nenhum jogo gerado. Gere o chaveamento na aba Config → Jogos.
-                  </p>
-                )}
               </Link>
             </li>
           );

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Pause, Play, Trash2, Flag, RotateCcw } from 'lucide-react';
+import { Pause, Play, Trash2, Flag, RotateCcw } from 'lucide-react';
 import { useEsportes, useJogos, useTimes } from '../hooks/useDados.js';
 import useCronometro, { formatarTempo } from '../hooks/useCronometro.js';
 import Button from '../components/common/Button.jsx';
 import Badge from '../components/common/Badge.jsx';
 import Modal from '../components/common/Modal.jsx';
 import ConfirmDialog from '../components/common/ConfirmDialog.jsx';
-import TimeChip from '../components/common/TimeChip.jsx';
+import BackButton from '../components/common/BackButton.jsx';
 import {
   iniciarJogo,
   lancarEvento,
@@ -92,15 +92,10 @@ export default function JogoDetalhe() {
   }
 
   return (
-    <div>
-      <button
-        onClick={() => navigate(-1)}
-        className="text-slate-400 hover:text-text inline-flex items-center gap-1 text-sm mb-2 transition"
-      >
-        <ArrowLeft size={16} /> Voltar
-      </button>
+    <div className="animate-fade-in">
+      <BackButton label="Voltar" className="mb-3" />
 
-      <div className="flex items-center justify-between mb-2 gap-2">
+      <div className="flex items-center justify-between mb-3 gap-2">
         <h1 className="text-xl font-bold truncate">{esporte.nome} — Jogo {jogo.ordem}</h1>
         <Badge status={jogo.status} />
       </div>
