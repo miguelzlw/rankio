@@ -25,11 +25,12 @@ export default function RodadasColetivo({ jogos, times }) {
               const a = timesPorId.get(j.timeAId);
               const b = timesPorId.get(j.timeBId);
               const fim = j.status === 'finalizado';
+              const aoVivo = j.status === 'ao_vivo';
               return (
                 <li key={j.id} className="flex items-center gap-2 text-sm">
                   <TimeChip time={a} size="sm" />
                   <span className="tabular-nums text-slate-400 mx-1">
-                    {fim ? `${j.pontosTimeA} × ${j.pontosTimeB}` : 'vs'}
+                    {fim || aoVivo ? `${j.placarTimeA ?? 0} × ${j.placarTimeB ?? 0}` : 'vs'}
                   </span>
                   <TimeChip time={b} size="sm" />
                   {fim && j.vencedor && (

@@ -49,8 +49,8 @@ export default function GrupoTable({ grupoId, timeIds, esporteId, jogos, times }
                 <li key={j.id} className="flex items-center gap-2 text-xs">
                   <TimeChip time={a} size="sm" />
                   <span className="tabular-nums text-slate-300 mx-1">
-                    {j.status === 'finalizado'
-                      ? `${j.pontosTimeA} × ${j.pontosTimeB}`
+                    {j.status === 'finalizado' || j.status === 'ao_vivo'
+                      ? `${j.placarTimeA ?? 0} × ${j.placarTimeB ?? 0}`
                       : '—'}
                   </span>
                   <TimeChip time={b} size="sm" />

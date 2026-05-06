@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useEsportes, useJogos, useTimes } from '../hooks/useDados.js';
-import { GitBranch, Settings, ArrowRight, Trophy, Users, ChevronRight } from 'lucide-react';
+import { GitBranch, Settings, ArrowRight, Trophy, Users, ChevronRight, Wand2 } from 'lucide-react';
 import BracketMataMata from '../components/chaveamento/BracketMataMata.jsx';
 import GrupoTable from '../components/chaveamento/GrupoTable.jsx';
 import RodadasColetivo from '../components/chaveamento/RodadasColetivo.jsx';
 import BackButton from '../components/common/BackButton.jsx';
+import { gerarMataMataAposGrupos, podeGerarMataMata } from '../services/firestore.js';
 
 export default function Chaveamento() {
   const { esporteId } = useParams();
@@ -225,11 +227,7 @@ function RenderEsporte({ esporte, jogos, times, timesPorId }) {
           {mm.length > 0 ? (
             <BracketMataMata jogos={mm} timesPorId={timesPorId} />
           ) : (
-            <div className="bg-surface/50 rounded-xl p-4 border border-white/10 text-center">
-              <p className="text-sm text-slate-400">
-                O mata-mata será gerado após o fim da fase de grupos.
-              </p>
-            </div>
+            <BotaoGerarMM esporte={esporte} todosJogos={jogosDoEsporte} times={times} />
           )}
         </section>
       </div>
@@ -237,4 +235,56 @@ function RenderEsporte({ esporte, jogos, times, timesPorId }) {
   }
 
   return null;
+}
+
+function BotaoGerarMM({ esporte, todosJogos, times }) {
+  const [gerando, setGerando] = useState(false);
+  const podeGerar = podeGerarMataMata(esporte, todosJogos);
+
+  async function handleGerar() {
+    setGerando(true);
+    try {
+      const r = await gerarMataMataAposGrupos(esporte, todosJogos, times);
+      if (!r.ok) alert('Não foi possível gerar o mata-mata.');
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao gerar mata-mata.');
+    } finally {
+      setGerando(false);
+    }
+  }
+
+  if (!podeGerar) {
+    return (
+      <div className="bg-surface/50 rounded-xl p-4 border border-white/10 text-center">
+        <p className="text-sm text-slate-400">
+          O mata-mata será habilitado após o fim de todos os jogos da fase de grupos.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-gradient-to-br from-accent/15 to-primary/15 border border-accent/40 rounded-2xl p-4 animate-pulse-glow">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-accent/20 border border-accent/40 flex items-center justify-center flex-shrink-0">
+          <Wand2 size={18} className="text-accent" />
+        </div>
+        <div className="flex-1">
+          <h4 className="font-semibold text-text mb-0.5">Pronto pra gerar!</h4>
+          <p className="text-xs text-slate-400 mb-3">
+            Todos os jogos da fase de grupos terminaram. Gere o chaveamento com os classificados.
+          </p>
+          <button
+            onClick={handleGerar}
+            disabled={gerando}
+            className="inline-flex items-center gap-2 bg-accent hover:bg-accent/90 disabled:opacity-60 text-background font-bold px-4 py-2 rounded-lg shadow-lg shadow-accent/20 transition active:scale-95 text-sm"
+          >
+            <Wand2 size={16} />
+            {gerando ? 'Gerando...' : 'Gerar mata-mata'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

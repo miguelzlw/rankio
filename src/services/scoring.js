@@ -1,38 +1,123 @@
-// Funcoes puras para calculo de placar de jogo, classificacao de grupo
-// e pontuacao total de cada time no torneio. Sem efeitos colaterais.
+// Funcoes puras para calculo de placar do jogo, pontos do torneio,
+// classificacao de grupo e ranking geral. Sem efeitos colaterais.
 //
-// CONTRATO DE DADOS (importante):
+// CONTRATO DE DADOS:
 //
-// Eventos lancados durante o jogo:
+// Esporte (campos relevantes pra pontuacao):
+//   {
+//     pontosVencedor: number,   // ex: +5 (aplicado ao vencedor ao finalizar)
+//     pontosPerdedor: number,   // ex: -1 ou 0 (aplicado ao perdedor)
+//     pontosEmpate: number,     // ex: +1 (so coletivo/grupos; mata-mata 1v1 nao permite empate)
+//     regras: [{
+//       id, nome,
+//       placarACausa, placarBSofre,    // afetam o placar do jogo (gols, cestas...)
+//       pontosACausa, pontosBSofre,    // afetam o ranking do torneio (bonus por evento)
+//     }]
+//   }
+//
+// Eventos (lancados durante o jogo):
 //   { id, regraId, regraNome, timeAfetado: 'A' | 'B', timestamp, timestampCronometro }
-//   - timeAfetado indica qual lado do jogo causou (A ou B), nao o id real do time.
 //
-// Jogo finalizado guarda:
-//   { pontosTimeA, pontosTimeB, vencedor: timeId | null, ... }
+// Jogo armazenado:
+//   {
+//     placarTimeA, placarTimeB,   // placar da partida (gols)
+//     pontosTimeA, pontosTimeB,   // pontos no ranking do torneio
+//     vencedor: timeId | null,    // determinado pelo PLACAR ao finalizar
+//   }
+//
+// COMPATIBILIDADE com regras antigas: se uma regra so tem `pontosACausa`/`pontosBSofre`
+// (modelo legado) e nao tem `placarACausa`/`placarBSofre`, tratamos os pontos como
+// placar (afinal, antes os "pontos" eram a unica medida do jogo).
 
+function placarCausaDe(regra) {
+  if (regra.placarACausa !== undefined) return regra.placarACausa || 0;
+  return regra.pontosACausa || 0;
+}
+function placarSofreDe(regra) {
+  if (regra.placarBSofre !== undefined) return regra.placarBSofre || 0;
+  return regra.pontosBSofre || 0;
+}
+function pontosCausaDe(regra) {
+  // So conta como pontos de torneio se a regra eh do modelo novo (tem placar* definido).
+  if (regra.placarACausa === undefined) return 0;
+  return regra.pontosACausa || 0;
+}
+function pontosSofreDe(regra) {
+  if (regra.placarACausa === undefined) return 0;
+  return regra.pontosBSofre || 0;
+}
+
+// Calcula o placar parcial e os pontos parciais do torneio com base nos eventos.
+// Retorna { placarTimeA, placarTimeB, pontosTimeA, pontosTimeB }.
+// Os pontos retornados aqui NAO incluem pontosVencedor/Perdedor/Empate — esses
+// sao aplicados em `aplicarPontosFinais` quando o jogo eh finalizado.
 export function calcularPlacarJogo(eventos = [], regras = []) {
   const regraPorId = new Map((regras || []).map((r) => [r.id, r]));
+  let placarA = 0;
+  let placarB = 0;
   let pontosA = 0;
   let pontosB = 0;
   for (const ev of eventos || []) {
     const regra = regraPorId.get(ev.regraId);
     if (!regra) continue;
-    const causa = regra.pontosACausa || 0;
-    const sofre = regra.pontosBSofre || 0;
+    const pCausa = placarCausaDe(regra);
+    const pSofre = placarSofreDe(regra);
+    const tCausa = pontosCausaDe(regra);
+    const tSofre = pontosSofreDe(regra);
     if (ev.timeAfetado === 'A') {
-      pontosA += causa;
-      pontosB += sofre;
+      placarA += pCausa;
+      placarB += pSofre;
+      pontosA += tCausa;
+      pontosB += tSofre;
     } else if (ev.timeAfetado === 'B') {
-      pontosB += causa;
-      pontosA += sofre;
+      placarB += pCausa;
+      placarA += pSofre;
+      pontosB += tCausa;
+      pontosA += tSofre;
     }
   }
-  return { pontosTimeA: pontosA, pontosTimeB: pontosB };
+  return { placarTimeA: placarA, placarTimeB: placarB, pontosTimeA: pontosA, pontosTimeB: pontosB };
 }
 
-// Soma da pontuacao de um time num esporte especifico.
-// Considera apenas jogos finalizados.
-// `jogos` pode ser a lista completa do app — filtramos por esporteId aqui.
+// Determina vencedor do jogo a partir do placar. Retorna timeId ou null (empate).
+export function determinarVencedor(jogo) {
+  const a = jogo.placarTimeA ?? 0;
+  const b = jogo.placarTimeB ?? 0;
+  if (a > b) return jogo.timeAId;
+  if (b > a) return jogo.timeBId;
+  return null;
+}
+
+// Aplica os pontos de vencedor/perdedor/empate nos pontos parciais que vieram dos eventos.
+// Retorna { pontosTimeA, pontosTimeB, vencedor }.
+export function aplicarPontosFinais(jogo, esporte) {
+  const placarA = jogo.placarTimeA ?? 0;
+  const placarB = jogo.placarTimeB ?? 0;
+  let pontosA = jogo.pontosTimeA ?? 0;
+  let pontosB = jogo.pontosTimeB ?? 0;
+
+  const pVenc = esporte?.pontosVencedor ?? 0;
+  const pPerd = esporte?.pontosPerdedor ?? 0;
+  const pEmp = esporte?.pontosEmpate ?? 0;
+
+  let vencedor = null;
+  if (placarA > placarB) {
+    vencedor = jogo.timeAId;
+    pontosA += pVenc;
+    pontosB += pPerd;
+  } else if (placarB > placarA) {
+    vencedor = jogo.timeBId;
+    pontosB += pVenc;
+    pontosA += pPerd;
+  } else {
+    pontosA += pEmp;
+    pontosB += pEmp;
+  }
+
+  return { pontosTimeA: pontosA, pontosTimeB: pontosB, vencedor };
+}
+
+// Soma de pontos do torneio de um time num esporte, considerando jogos finalizados.
 export function pontuacaoTimeNoEsporte(timeId, esporteId, jogos = []) {
   let total = 0;
   for (const j of jogos) {
@@ -44,20 +129,20 @@ export function pontuacaoTimeNoEsporte(timeId, esporteId, jogos = []) {
   return total;
 }
 
-// Saldo de pontos de um time num esporte (pontos feitos - sofridos no jogo).
-function saldoNoEsporte(timeId, esporteId, jogos) {
+// Saldo de placar (gols feitos − sofridos) do time num esporte.
+function saldoPlacarNoEsporte(timeId, esporteId, jogos) {
   let saldo = 0;
   for (const j of jogos) {
     if (j.esporteId !== esporteId) continue;
     if (j.status !== 'finalizado') continue;
-    if (j.timeAId === timeId) saldo += (j.pontosTimeA ?? 0) - (j.pontosTimeB ?? 0);
-    if (j.timeBId === timeId) saldo += (j.pontosTimeB ?? 0) - (j.pontosTimeA ?? 0);
+    const a = j.placarTimeA ?? 0;
+    const b = j.placarTimeB ?? 0;
+    if (j.timeAId === timeId) saldo += a - b;
+    if (j.timeBId === timeId) saldo += b - a;
   }
   return saldo;
 }
 
-// Vencedor do confronto direto entre dois times num esporte.
-// Retorna o id do time vencedor, ou null se empate / nao se enfrentaram.
 function vencedorConfrontoDireto(idA, idB, esporteId, jogos) {
   let vitoriasA = 0;
   let vitoriasB = 0;
@@ -75,8 +160,7 @@ function vencedorConfrontoDireto(idA, idB, esporteId, jogos) {
   return null;
 }
 
-// Ranking geral do torneio (todos os esportes somados).
-// Retorna [{ time, total, breakdown: { [esporteId]: pontos } }] desc.
+// Ranking geral (todos os esportes somados).
 export function calcularRanking(times = [], esportes = [], jogos = []) {
   return (times || [])
     .map((time) => {
@@ -92,14 +176,13 @@ export function calcularRanking(times = [], esportes = [], jogos = []) {
     .sort((a, b) => b.total - a.total);
 }
 
-// Classifica os times de um grupo (ou de qualquer subconjunto num esporte).
-// Criterios: pontos no esporte (desc), saldo (desc), confronto direto, ordem de cadastro.
-// Retorna: [{ time, pontos, saldo, ordemCadastro }] na ordem da classificacao.
+// Classifica os times de um grupo (ou subconjunto num esporte).
+// Criterios: pontos no esporte → saldo de placar → confronto direto → ordem cadastro.
 export function classificarGrupo(timesDoGrupo = [], jogosDoEsporte = [], esporteId) {
   const dados = (timesDoGrupo || []).map((t, idx) => ({
     time: t,
     pontos: pontuacaoTimeNoEsporte(t.id, esporteId, jogosDoEsporte),
-    saldo: saldoNoEsporte(t.id, esporteId, jogosDoEsporte),
+    saldo: saldoPlacarNoEsporte(t.id, esporteId, jogosDoEsporte),
     ordemCadastro: idx,
   }));
 

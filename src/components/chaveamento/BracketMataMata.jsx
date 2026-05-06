@@ -65,29 +65,38 @@ function JogoBracket({ jogo, timesPorId }) {
   const a = timesPorId.get(jogo.timeAId);
   const b = timesPorId.get(jogo.timeBId);
   const fim = jogo.status === 'finalizado';
+  const aoVivo = jogo.status === 'ao_vivo';
   return (
-    <div className="bg-surface/50 rounded-lg border border-white/10 p-2 text-xs">
+    <div
+      className={`rounded-lg border p-2 text-xs transition ${
+        aoVivo
+          ? 'bg-red-500/5 border-red-500/40'
+          : fim
+            ? 'bg-surface/50 border-white/10'
+            : 'bg-surface/30 border-white/10'
+      }`}
+    >
       <Linha
         time={a}
-        pontos={fim ? jogo.pontosTimeA : null}
+        placar={fim || aoVivo ? jogo.placarTimeA ?? 0 : null}
         vencedor={fim && jogo.vencedor === jogo.timeAId}
       />
       <div className="border-t border-white/10 my-1" />
       <Linha
         time={b}
-        pontos={fim ? jogo.pontosTimeB : null}
+        placar={fim || aoVivo ? jogo.placarTimeB ?? 0 : null}
         vencedor={fim && jogo.vencedor === jogo.timeBId}
       />
     </div>
   );
 }
 
-function Linha({ time, pontos, vencedor }) {
+function Linha({ time, placar, vencedor }) {
   return (
-    <div className={`flex items-center gap-2 ${vencedor ? 'font-semibold' : ''}`}>
+    <div className={`flex items-center gap-2 ${vencedor ? 'font-semibold text-accent' : ''}`}>
       <TimeChip time={time} size="sm" placeholder="—" />
-      {pontos !== null && pontos !== undefined && (
-        <span className="ml-auto tabular-nums text-text">{pontos}</span>
+      {placar !== null && placar !== undefined && (
+        <span className="ml-auto tabular-nums text-text">{placar}</span>
       )}
     </div>
   );

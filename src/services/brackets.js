@@ -40,6 +40,8 @@ function jogoBase(esporteId, fase, ordem, extras = {}) {
     status: 'agendado',
     fase,
     eventos: [],
+    placarTimeA: 0,
+    placarTimeB: 0,
     pontosTimeA: 0,
     pontosTimeB: 0,
     vencedor: null,
