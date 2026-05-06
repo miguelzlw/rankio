@@ -5,6 +5,7 @@ import { ChevronDown, Wand2, Radio, Calendar, CheckCircle2 } from 'lucide-react'
 import Badge from '../components/common/Badge.jsx';
 import TimeChip from '../components/common/TimeChip.jsx';
 import BackButton from '../components/common/BackButton.jsx';
+import { useToast } from '../components/common/ToastProvider.jsx';
 import { pontuacaoTimeNoEsporte } from '../services/scoring.js';
 import { gerarMataMataAposGrupos, podeGerarMataMata } from '../services/firestore.js';
 
@@ -15,6 +16,7 @@ export default function EsporteDetalhe() {
   const { data: times } = useTimes();
   const [finalizadosAbertos, setFinalizadosAbertos] = useState(false);
   const [gerandoMM, setGerandoMM] = useState(false);
+  const toast = useToast();
 
   const esporte = esportes.find((e) => e.id === esporteId);
   if (!esporte) {
@@ -45,12 +47,14 @@ export default function EsporteDetalhe() {
     setGerandoMM(true);
     try {
       const r = await gerarMataMataAposGrupos(esporte, jogos, times);
-      if (!r.ok) {
-        alert('Não foi possível gerar o mata-mata.');
+      if (r.ok) {
+        toast.success(`Mata-mata gerado com ${r.criados} jogo(s)!`);
+      } else {
+        toast.error('Não foi possível gerar o mata-mata.');
       }
     } catch (e) {
       console.error(e);
-      alert('Erro ao gerar mata-mata.');
+      toast.error('Erro ao gerar mata-mata.');
     } finally {
       setGerandoMM(false);
     }

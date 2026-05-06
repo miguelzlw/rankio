@@ -6,6 +6,7 @@ import BracketMataMata from '../components/chaveamento/BracketMataMata.jsx';
 import GrupoTable from '../components/chaveamento/GrupoTable.jsx';
 import RodadasColetivo from '../components/chaveamento/RodadasColetivo.jsx';
 import BackButton from '../components/common/BackButton.jsx';
+import { useToast } from '../components/common/ToastProvider.jsx';
 import { gerarMataMataAposGrupos, podeGerarMataMata } from '../services/firestore.js';
 
 export default function Chaveamento() {
@@ -239,16 +240,21 @@ function RenderEsporte({ esporte, jogos, times, timesPorId }) {
 
 function BotaoGerarMM({ esporte, todosJogos, times }) {
   const [gerando, setGerando] = useState(false);
+  const toast = useToast();
   const podeGerar = podeGerarMataMata(esporte, todosJogos);
 
   async function handleGerar() {
     setGerando(true);
     try {
       const r = await gerarMataMataAposGrupos(esporte, todosJogos, times);
-      if (!r.ok) alert('Não foi possível gerar o mata-mata.');
+      if (r.ok) {
+        toast.success(`Mata-mata gerado com ${r.criados} jogo(s)!`);
+      } else {
+        toast.error('Não foi possível gerar o mata-mata.');
+      }
     } catch (e) {
       console.error(e);
-      alert('Erro ao gerar mata-mata.');
+      toast.error('Erro ao gerar mata-mata.');
     } finally {
       setGerando(false);
     }

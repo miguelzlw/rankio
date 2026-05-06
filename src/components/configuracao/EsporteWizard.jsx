@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Trash2, Plus, Trophy, X, Minus } from 'lucide-react';
+import { Trash2, Plus, Trophy } from 'lucide-react';
 import Button from '../common/Button.jsx';
 import Modal from '../common/Modal.jsx';
+import { useToast } from '../common/ToastProvider.jsx';
 import { criarEsporte, atualizarEsporte } from '../../services/firestore.js';
 
 function genId(prefix) {
@@ -19,6 +20,7 @@ const PASSO_NOMES = ['Tipo', 'Formato', 'Pontuação', 'Participantes'];
 
 export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
   const editando = !!esporteEdicao;
+  const toast = useToast();
   const [passo, setPasso] = useState(editando ? 2 : 1);
   const [tipo, setTipo] = useState(esporteEdicao?.tipo ?? '1v1');
   const [nome, setNome] = useState(esporteEdicao?.nome ?? '');
@@ -69,13 +71,15 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
 
       if (editando) {
         await atualizarEsporte(esporteEdicao.id, dados);
+        toast.success(`Esporte "${nome}" atualizado.`);
       } else {
         await criarEsporte(dados);
+        toast.success(`Esporte "${nome}" criado.`);
       }
       onClose();
     } catch (error) {
       console.error('Erro ao salvar esporte:', error);
-      alert('Ocorreu um erro no banco de dados. Tente novamente.');
+      toast.error('Erro ao salvar esporte. Verifique a conexão com o Firestore.');
     }
   }
 

@@ -5,6 +5,7 @@ import Button from '../common/Button.jsx';
 import Modal from '../common/Modal.jsx';
 import ConfirmDialog from '../common/ConfirmDialog.jsx';
 import ColorPicker from '../common/ColorPicker.jsx';
+import { useToast } from '../common/ToastProvider.jsx';
 import { criarTime, atualizarTime, removerTime } from '../../services/firestore.js';
 
 const PALETA_DEFAULT = '#3b82f6';
@@ -14,6 +15,7 @@ export default function TimesManager() {
   const { data: jogos } = useJogos();
   const [editando, setEditando] = useState(null);
   const [removendo, setRemovendo] = useState(null);
+  const toast = useToast();
 
   function abrirNovo() {
     setEditando({ id: null, nome: '', cor: PALETA_DEFAULT });
@@ -24,23 +26,27 @@ export default function TimesManager() {
     try {
       if (editando.id) {
         await atualizarTime(editando.id, { nome: editando.nome, cor: editando.cor });
+        toast.success(`Time "${editando.nome}" atualizado.`);
       } else {
         await criarTime({ nome: editando.nome, cor: editando.cor });
+        toast.success(`Time "${editando.nome}" criado.`);
       }
       setEditando(null);
     } catch (error) {
       console.error('Erro ao salvar time:', error);
-      alert('Ocorrou um erro no banco de dados. Verifique se o Firestore está ativado e tente novamente.');
+      toast.error('Erro ao salvar. Verifique a conexão com o Firestore.');
     }
   }
 
   async function confirmarRemocao() {
     try {
+      const nome = removendo.nome;
       await removerTime(removendo.id);
       setRemovendo(null);
+      toast.success(`Time "${nome}" removido.`);
     } catch (error) {
       console.error('Erro ao remover time:', error);
-      alert('Erro ao remover. Tente novamente.');
+      toast.error('Erro ao remover. Tente novamente.');
     }
   }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pause, Play, Trash2, Flag, RotateCcw, Trophy, Handshake } from 'lucide-react';
+import { Pause, Play, Trash2, Flag, RotateCcw, Trophy, Handshake, Unlock } from 'lucide-react';
 import { useEsportes, useJogos, useTimes } from '../hooks/useDados.js';
 import useCronometro, { formatarTempo } from '../hooks/useCronometro.js';
 import Button from '../components/common/Button.jsx';
@@ -8,12 +8,14 @@ import Badge from '../components/common/Badge.jsx';
 import Modal from '../components/common/Modal.jsx';
 import ConfirmDialog from '../components/common/ConfirmDialog.jsx';
 import BackButton from '../components/common/BackButton.jsx';
+import { useToast } from '../components/common/ToastProvider.jsx';
 import {
   iniciarJogo,
   lancarEvento,
   removerEvento,
   finalizarJogo,
   definirVencedorManual,
+  reabrirJogo,
 } from '../services/firestore.js';
 
 function genEventoId() {
@@ -29,11 +31,12 @@ export default function JogoDetalhe() {
   const cronometro = useCronometro();
   const [confirmarFim, setConfirmarFim] = useState(false);
   const [eventoARemover, setEventoARemover] = useState(null);
-  const [erro, setErro] = useState(null);
+  const [confirmarReabertura, setConfirmarReabertura] = useState(false);
   const [flashA, setFlashA] = useState(false);
   const [flashB, setFlashB] = useState(false);
   const [vencedorManualAberto, setVencedorManualAberto] = useState(false);
   const [processando, setProcessando] = useState(false);
+  const toast = useToast();
 
   const esporte = esportes.find((e) => e.id === esporteId);
   const jogo = jogos.find((j) => j.id === jogoId);
@@ -103,10 +106,14 @@ export default function JogoDetalhe() {
       };
       const resultado = await finalizarJogo(jogoAtualizado, esporte);
       if (resultado.ok) {
+        toast.success('Jogo finalizado!');
         navigate(`/esportes/${esporteId}`);
       } else {
-        setErro('Erro ao finalizar o jogo.');
+        toast.error('Erro ao finalizar o jogo.');
       }
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao finalizar o jogo.');
     } finally {
       setProcessando(false);
       setVencedorManualAberto(false);
@@ -116,11 +123,34 @@ export default function JogoDetalhe() {
   async function handleFinalizar() {
     setConfirmarFim(false);
     cronometro.pausar();
-    const resultado = await finalizarJogo(jogo, esporte);
-    if (!resultado.ok) {
-      setErro('Não é possível finalizar com placar empatado em mata-mata. Lance mais eventos para desempatar.');
-    } else {
-      navigate(`/esportes/${esporteId}`);
+    try {
+      const resultado = await finalizarJogo(jogo, esporte);
+      if (!resultado.ok) {
+        toast.warning('Empate em mata-mata. Lance mais eventos para desempatar.');
+      } else {
+        toast.success('Jogo finalizado!');
+        navigate(`/esportes/${esporteId}`);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao finalizar.');
+    }
+  }
+
+  async function handleReabrir() {
+    setConfirmarReabertura(false);
+    try {
+      const resultado = await reabrirJogo(jogo, esporte, jogos);
+      if (resultado.ok) {
+        toast.success('Jogo reaberto. Você pode editar o placar agora.');
+      } else if (resultado.motivo === 'proximo_em_andamento') {
+        toast.warning('Não dá pra reabrir: o próximo jogo do bracket já começou ou foi finalizado.');
+      } else {
+        toast.error('Erro ao reabrir o jogo.');
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Erro ao reabrir o jogo.');
     }
   }
 
@@ -250,8 +280,20 @@ export default function JogoDetalhe() {
           ) : (
             <>
               <section className="grid grid-cols-2 gap-2 mb-4">
-                <ColunaEventos time={timeA} esporte={esporte} ladoEvento="A" onEvento={handleEvento} />
-                <ColunaEventos time={timeB} esporte={esporte} ladoEvento="B" onEvento={handleEvento} />
+                <ColunaEventos
+                  time={timeA}
+                  esporte={esporte}
+                  ladoEvento="A"
+                  onEvento={handleEvento}
+                  fallback="Time A"
+                />
+                <ColunaEventos
+                  time={timeB}
+                  esporte={esporte}
+                  ladoEvento="B"
+                  onEvento={handleEvento}
+                  fallback="Time B"
+                />
               </section>
 
               {/* Timeline */}
@@ -319,7 +361,16 @@ export default function JogoDetalhe() {
       )}
 
       {jogo.status === 'finalizado' && (
-        <ResumoFinalizado jogo={jogo} timeA={timeA} timeB={timeB} esporte={esporte} />
+        <>
+          <ResumoFinalizado jogo={jogo} timeA={timeA} timeB={timeB} esporte={esporte} />
+          <button
+            onClick={() => setConfirmarReabertura(true)}
+            className="w-full mt-4 flex items-center justify-center gap-2 text-xs text-slate-500 hover:text-amber-400 border border-dashed border-white/10 hover:border-amber-500/40 bg-surface/30 rounded-lg py-2.5 transition"
+          >
+            <Unlock size={14} />
+            Reabrir jogo (corrigir placar)
+          </button>
+        </>
       )}
 
       <ConfirmDialog
@@ -346,16 +397,37 @@ export default function JogoDetalhe() {
         destrutivo
       />
 
+      <ConfirmDialog
+        open={confirmarReabertura}
+        onClose={() => setConfirmarReabertura(false)}
+        onConfirm={handleReabrir}
+        title="Reabrir jogo?"
+        message="O jogo volta para 'ao vivo'. Os pontos do ranking ganhos por este jogo serão revertidos até você finalizar de novo. Em mata-mata, o time que avançou para o próximo jogo será removido."
+        confirmLabel="Reabrir"
+      />
+
       <Modal
         open={vencedorManualAberto}
         onClose={() => !processando && setVencedorManualAberto(false)}
         title="Definir vencedor manualmente"
       >
         <div className="space-y-3">
-          <p className="text-sm text-slate-400">
-            Isso vai <strong className="text-amber-400">substituir o placar</strong> e finalizar
-            o jogo. Útil quando você quer encerrar direto sem mexer em eventos.
-          </p>
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-200 space-y-1">
+            <p className="font-semibold flex items-center gap-1.5">
+              <Handshake size={14} /> Atenção
+            </p>
+            <ul className="space-y-1 text-amber-200/90 list-disc list-inside">
+              <li>O placar atual será substituído por <strong>1 × 0</strong> (ou 1 × 1 em empate).</li>
+              {(jogo.eventos?.length ?? 0) > 0 && (
+                <li>
+                  Os <strong>{jogo.eventos.length} evento(s)</strong> lançados ficam preservados na timeline,
+                  mas não vão mais bater com o placar mostrado.
+                </li>
+              )}
+              <li>O jogo é finalizado imediatamente e os pontos vão pro ranking.</li>
+            </ul>
+          </div>
+          <p className="text-sm text-slate-300 font-medium">Quem venceu?</p>
           <div className="space-y-2">
             <BotaoVencedor
               time={timeA}
@@ -388,9 +460,6 @@ export default function JogoDetalhe() {
         </div>
       </Modal>
 
-      <Modal open={!!erro} onClose={() => setErro(null)} title="Atenção">
-        <p>{erro}</p>
-      </Modal>
     </div>
   );
 }
@@ -427,25 +496,40 @@ function textoConfirmacaoFinal(jogo, esporte, timeA, timeB) {
   return `Placar ${placarA} × ${placarB}. ${resultado}. Após finalizar, o jogo fica imutável e os pontos vão para o ranking.`;
 }
 
-function ColunaEventos({ time, esporte, ladoEvento, onEvento }) {
+// Coluna de eventos otimizada pra uso a duas maos no celular: botoes grandes
+// (h-14), borda colorida do time, ativo com cor do time pra diferenciar bem.
+function ColunaEventos({ time, esporte, ladoEvento, onEvento, fallback }) {
+  const cor = time?.cor || '#94a3b8';
   return (
     <div>
-      <p className="text-xs text-slate-400 mb-1 font-medium truncate">
-        {time?.nome ?? `Time ${ladoEvento}`}
-      </p>
-      <div className="space-y-1">
+      <div
+        className="flex items-center gap-1.5 px-2 py-1.5 rounded-t-lg border-b-2 mb-2"
+        style={{ borderColor: cor + 'cc', backgroundColor: cor + '20' }}
+      >
+        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cor }} />
+        <p className="text-xs font-bold text-text truncate">
+          {time?.nome ?? fallback}
+        </p>
+      </div>
+      <div className="space-y-1.5">
         {(esporte.regras || []).map((r) => {
           const placarMostrar = r.placarACausa ?? r.pontosACausa ?? 0;
           return (
             <button
               key={r.id}
               onClick={() => onEvento(r, ladoEvento)}
-              className="w-full text-left bg-surface/60 hover:bg-surface border border-white/10 hover:border-accent/40 text-text rounded-lg px-3 py-2 text-sm transition active:scale-95"
+              className="w-full text-left border border-white/10 hover:border-white/30 text-text rounded-lg px-3 py-3 text-sm transition active:scale-95 group"
+              style={{
+                backgroundColor: cor + '15',
+              }}
             >
-              <span className="font-medium">{r.nome}</span>
+              <span className="font-semibold leading-tight block">{r.nome}</span>
               {placarMostrar !== 0 && (
-                <span className="text-xs text-slate-400 ml-2">
-                  ({placarMostrar > 0 ? '+' : ''}{placarMostrar})
+                <span
+                  className="text-[11px] font-bold tabular-nums opacity-80"
+                  style={{ color: cor }}
+                >
+                  {placarMostrar > 0 ? '+' : ''}{placarMostrar}
                 </span>
               )}
             </button>

@@ -183,6 +183,44 @@ export async function finalizarJogo(jogo, esporte) {
   return { ok: true };
 }
 
+// Reabre um jogo finalizado, voltando seu status pra 'ao_vivo' e recalculando
+// os pontos parciais a partir dos eventos (sem o bonus de vencedor/perdedor).
+// Bloqueia se for mata-mata e o proximo jogo do bracket ja foi iniciado, pois
+// senao o estado fica inconsistente. Limpa o time alimentado no proximo jogo.
+export async function reabrirJogo(jogo, esporte, todosJogos = []) {
+  // Mata-mata: nao deixa reabrir se proximo jogo ja saiu de 'agendado'
+  if (jogo.fase === 'mata-mata' && jogo.proximoJogoId) {
+    const prox = todosJogos.find((j) => j.id === jogo.proximoJogoId);
+    if (prox && prox.status !== 'agendado') {
+      return { ok: false, motivo: 'proximo_em_andamento' };
+    }
+  }
+
+  const batch = writeBatch(db);
+
+  // Recalcula pontos parciais a partir dos eventos atuais (sem bonus de vencedor)
+  const calc = calcularPlacarJogo(jogo.eventos || [], esporte?.regras || []);
+
+  batch.update(doc(db, 'jogos', jogo.id), {
+    status: 'ao_vivo',
+    vencedor: null,
+    finalizadoEm: null,
+    placarTimeA: calc.placarTimeA,
+    placarTimeB: calc.placarTimeB,
+    pontosTimeA: calc.pontosTimeA,
+    pontosTimeB: calc.pontosTimeB,
+  });
+
+  // Se foi mata-mata, limpa o slot que esse jogo alimentou no proximo jogo
+  if (jogo.fase === 'mata-mata' && jogo.proximoJogoId && jogo.vencedor) {
+    const campo = jogo.slot === 'A' ? 'timeAId' : 'timeBId';
+    batch.update(doc(db, 'jogos', jogo.proximoJogoId), { [campo]: null });
+  }
+
+  await batch.commit();
+  return { ok: true };
+}
+
 // Verifica se eh possivel gerar mata-mata pos-grupos para um esporte.
 // Retorna true se: formato eh grupos-mata-mata, todos os jogos de grupos finalizaram,
 // e ainda nao existem jogos de mata-mata.
