@@ -248,8 +248,15 @@ function CardJogo({ jogo, esporteId, timesPorId, destaque, apagado }) {
         </div>
         <div className="flex items-center justify-between gap-2">
           <TimeChip time={timeA} size="sm" placeholder="A definir" />
-          <span className="font-bold text-text tabular-nums text-base">
-            {placarA} <span className="text-slate-500 mx-0.5">×</span> {placarB}
+          <span className="font-bold text-text tabular-nums text-base flex flex-col items-center">
+            <span>
+              {placarA} <span className="text-slate-500 mx-0.5">×</span> {placarB}
+            </span>
+            {jogo.vencedorPorDesempate && (
+              <span className="text-[9px] text-emerald-400 font-semibold uppercase tracking-wider mt-0.5">
+                desempate
+              </span>
+            )}
           </span>
           <TimeChip time={timeB} size="sm" placeholder="A definir" />
         </div>

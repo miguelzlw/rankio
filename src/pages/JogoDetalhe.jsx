@@ -58,7 +58,8 @@ export default function JogoDetalhe() {
   const placarA = jogo.placarTimeA ?? 0;
   const placarB = jogo.placarTimeB ?? 0;
   const empate = placarA === placarB;
-  const podeFinalizar = !(ehMataMata && empate);
+  // Em mata-mata pode finalizar com empate se ha vencedorOverride (penaltis)
+  const podeFinalizar = !(ehMataMata && empate) || !!jogo.vencedorOverride;
   const semRegras = (esporte.regras || []).length === 0;
 
   async function handleIniciar() {
@@ -108,23 +109,33 @@ export default function JogoDetalhe() {
   }
 
   async function handleVencedorRapido(timeId) {
-    // Define o placar simbolicamente (1×0 ou 0×1, ou 1×1 em empate) e finaliza
-    // o jogo aplicando pontosVencedor/Perdedor/Empate. Substitui o placar atual.
+    // definirVencedorManual decide entre placar simbolico (0x0) ou
+    // vencedorOverride (mantem placar). Depois finaliza aplicando pontos.
     if (processando) return;
     setProcessando(true);
     try {
       cronometro.pausar();
       await definirVencedorManual(jogo, timeId);
-      const jogoAtualizado = {
-        ...jogo,
-        placarTimeA:
-          timeId === jogo.timeAId ? 1 : timeId === jogo.timeBId ? 0 : 1,
-        placarTimeB:
-          timeId === jogo.timeBId ? 1 : timeId === jogo.timeAId ? 0 : 1,
-      };
+      // Reflete o que `definirVencedorManual` faria, em memoria, pra
+      // finalizar imediatamente (sem esperar snapshot)
+      const placarZerado = placarA === 0 && placarB === 0;
+      const jogoAtualizado = { ...jogo };
+      if (placarZerado) {
+        jogoAtualizado.placarTimeA = timeId === jogo.timeAId ? 1 : timeId === jogo.timeBId ? 0 : 1;
+        jogoAtualizado.placarTimeB = timeId === jogo.timeBId ? 1 : timeId === jogo.timeAId ? 0 : 1;
+        jogoAtualizado.vencedorOverride = null;
+        jogoAtualizado.vencedorPorDesempate = false;
+      } else {
+        jogoAtualizado.vencedorOverride = timeId ?? null;
+        jogoAtualizado.vencedorPorDesempate = empate && !!timeId;
+      }
       const resultado = await finalizarJogo(jogoAtualizado, esporte);
       if (resultado.ok) {
-        toast.success('Jogo finalizado!');
+        toast.success(
+          jogoAtualizado.vencedorPorDesempate
+            ? 'Jogo finalizado por desempate!'
+            : 'Jogo finalizado!'
+        );
         navigate(`/esportes/${esporteId}`);
       } else {
         toast.error('Erro ao finalizar o jogo.');
@@ -365,17 +376,30 @@ export default function JogoDetalhe() {
               </Button>
               {!podeFinalizar && (
                 <p className="text-xs text-amber-400 mt-2 text-center">
-                  Empate em mata-mata: marque um evento desempatador antes de finalizar.
+                  Empate em mata-mata: lance um evento desempatador <strong>ou</strong> defina o vencedor por pênaltis abaixo.
                 </p>
               )}
 
-              {/* Atalho: definir vencedor manualmente sem precisar mexer no placar */}
+              {/* Atalho: definir vencedor manualmente. Em empate, mantem o placar. */}
               <button
                 onClick={() => setVencedorManualAberto(true)}
-                className="w-full mt-3 flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-accent border border-white/10 hover:border-accent/40 bg-surface/40 rounded-lg py-2.5 transition"
+                className={`w-full mt-3 flex items-center justify-center gap-2 text-xs border rounded-lg py-2.5 transition ${
+                  ehMataMata && empate
+                    ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15'
+                    : 'text-slate-400 hover:text-accent border-white/10 hover:border-accent/40 bg-surface/40'
+                }`}
               >
-                <Trophy size={14} />
-                Definir vencedor manualmente
+                {ehMataMata && empate ? (
+                  <>
+                    <Handshake size={14} />
+                    Decidir nos pênaltis (manter empate)
+                  </>
+                ) : (
+                  <>
+                    <Trophy size={14} />
+                    Definir vencedor manualmente
+                  </>
+                )}
               </button>
             </>
           )}
@@ -431,55 +455,51 @@ export default function JogoDetalhe() {
       <Modal
         open={vencedorManualAberto}
         onClose={() => !processando && setVencedorManualAberto(false)}
-        title="Definir vencedor manualmente"
+        title={
+          empate && (placarA > 0 || placarB > 0)
+            ? 'Decisão por desempate'
+            : 'Definir vencedor manualmente'
+        }
       >
-        <div className="space-y-3">
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-200 space-y-1">
-            <p className="font-semibold flex items-center gap-1.5">
-              <Handshake size={14} /> Atenção
-            </p>
-            <ul className="space-y-1 text-amber-200/90 list-disc list-inside">
-              <li>O placar atual será substituído por <strong>1 × 0</strong> (ou 1 × 1 em empate).</li>
-              {(jogo.eventos?.length ?? 0) > 0 && (
-                <li>
-                  Os <strong>{jogo.eventos.length} evento(s)</strong> lançados ficam preservados na timeline,
-                  mas não vão mais bater com o placar mostrado.
-                </li>
-              )}
-              <li>O jogo é finalizado imediatamente e os pontos vão pro ranking.</li>
-            </ul>
-          </div>
-          <p className="text-sm text-slate-300 font-medium">Quem venceu?</p>
-          <div className="space-y-2">
-            <BotaoVencedor
-              time={timeA}
-              fallback="Time A"
-              onClick={() => handleVencedorRapido(jogo.timeAId)}
-              disabled={!timeA || processando}
-            />
-            <BotaoVencedor
-              time={timeB}
-              fallback="Time B"
-              onClick={() => handleVencedorRapido(jogo.timeBId)}
-              disabled={!timeB || processando}
-            />
-            {!ehMataMata && (esporte.pontosEmpate ?? 0) !== 0 && (
-              <button
-                onClick={() => handleVencedorRapido(null)}
-                disabled={processando}
-                className="w-full p-3 rounded-xl border-2 border-white/10 hover:border-slate-400/60 bg-surface/60 transition active:scale-[0.99] disabled:opacity-40"
-              >
-                <div className="flex items-center justify-center gap-2 text-slate-300">
-                  <Handshake size={18} />
-                  <span className="font-medium">Empate</span>
-                </div>
-              </button>
-            )}
-          </div>
-          {processando && (
-            <p className="text-xs text-slate-500 text-center">Processando...</p>
+        <AvisoVencedorManual
+          placarA={placarA}
+          placarB={placarB}
+          empate={empate}
+          numEventos={jogo.eventos?.length ?? 0}
+          ehMataMata={ehMataMata}
+        />
+        <p className="text-sm text-slate-300 font-medium mt-3 mb-2">
+          {empate && (placarA > 0 || placarB > 0) ? 'Quem venceu o desempate?' : 'Quem venceu?'}
+        </p>
+        <div className="space-y-2">
+          <BotaoVencedor
+            time={timeA}
+            fallback="Time A"
+            onClick={() => handleVencedorRapido(jogo.timeAId)}
+            disabled={!timeA || processando}
+          />
+          <BotaoVencedor
+            time={timeB}
+            fallback="Time B"
+            onClick={() => handleVencedorRapido(jogo.timeBId)}
+            disabled={!timeB || processando}
+          />
+          {!ehMataMata && (esporte.pontosEmpate ?? 0) !== 0 && (
+            <button
+              onClick={() => handleVencedorRapido(null)}
+              disabled={processando}
+              className="w-full p-3 rounded-xl border-2 border-white/10 hover:border-slate-400/60 bg-surface/60 transition active:scale-[0.99] disabled:opacity-40"
+            >
+              <div className="flex items-center justify-center gap-2 text-slate-300">
+                <Handshake size={18} />
+                <span className="font-medium">Empate</span>
+              </div>
+            </button>
           )}
         </div>
+        {processando && (
+          <p className="text-xs text-slate-500 text-center mt-2">Processando...</p>
+        )}
       </Modal>
 
       {/* Modal de selecao de autor (artilharia) */}
@@ -546,6 +566,59 @@ function ModalAutor({ autorPendente, timeA, timeB, onEscolher, onCancelar }) {
   );
 }
 
+// Aviso adaptativo no modal de vencedor manual conforme o placar atual.
+// Tres cenarios:
+// 1) Placar 0x0: vai por placar simbolico 1x0
+// 2) Placar empatado com gols (ex: 3x3): mantem o empate, vencedor por desempate
+// 3) Placar nao-empate (ex: 3x2): mantem placar mas usuario pode contradizer
+function AvisoVencedorManual({ placarA, placarB, empate, numEventos, ehMataMata }) {
+  const placarZerado = placarA === 0 && placarB === 0;
+
+  if (placarZerado) {
+    return (
+      <div className="bg-sky-500/10 border border-sky-500/30 rounded-lg p-3 text-xs text-sky-200 space-y-1">
+        <p className="font-semibold">Sem placar registrado</p>
+        <p className="text-sky-200/90">
+          O placar simbólico ficará <strong>1 × 0</strong> (ou 1 × 1 em empate). O jogo será finalizado e os pontos do esporte serão aplicados ao ranking.
+        </p>
+      </div>
+    );
+  }
+
+  if (empate) {
+    return (
+      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 text-xs text-emerald-200 space-y-1">
+        <p className="font-semibold flex items-center gap-1.5">
+          <Handshake size={14} /> Decisão por desempate
+        </p>
+        <p className="text-emerald-200/90">
+          O placar permanece <strong className="tabular-nums">{placarA} × {placarB}</strong>. Você marca quem venceu no desempate (pênaltis, sorteio, etc.) sem alterar o placar do jogo.
+        </p>
+        {ehMataMata && (
+          <p className="text-emerald-200/70 text-[11px] mt-1">
+            O time escolhido avança no chaveamento.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Placar decisivo (3x2 etc.)
+  return (
+    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs text-amber-200 space-y-1">
+      <p className="font-semibold">Atenção</p>
+      <p className="text-amber-200/90">
+        Placar atual: <strong className="tabular-nums">{placarA} × {placarB}</strong>. Se você escolher um vencedor diferente do que o placar mostra, o jogo será finalizado com sua escolha (placar mantido).
+      </p>
+      {numEventos > 0 && (
+        <p className="text-amber-200/70 text-[11px]">
+          Os {numEventos} evento(s) lançados ficam preservados na timeline.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function BotaoVencedor({ time, fallback, onClick, disabled }) {
   return (
     <button
@@ -572,9 +645,22 @@ function textoConfirmacaoFinal(jogo, esporte, timeA, timeB) {
   const placarA = jogo.placarTimeA ?? 0;
   const placarB = jogo.placarTimeB ?? 0;
   let resultado;
-  if (placarA > placarB) resultado = `Vencedor: ${timeA?.nome ?? 'Time A'}`;
-  else if (placarB > placarA) resultado = `Vencedor: ${timeB?.nome ?? 'Time B'}`;
-  else resultado = 'Empate';
+  // Override (penaltis) tem prioridade
+  if (jogo.vencedorOverride) {
+    const nomeVencedor =
+      jogo.vencedorOverride === jogo.timeAId
+        ? timeA?.nome ?? 'Time A'
+        : jogo.vencedorOverride === jogo.timeBId
+          ? timeB?.nome ?? 'Time B'
+          : '—';
+    resultado = `Vencedor: ${nomeVencedor} (por desempate)`;
+  } else if (placarA > placarB) {
+    resultado = `Vencedor: ${timeA?.nome ?? 'Time A'}`;
+  } else if (placarB > placarA) {
+    resultado = `Vencedor: ${timeB?.nome ?? 'Time B'}`;
+  } else {
+    resultado = 'Empate';
+  }
   return `Placar ${placarA} × ${placarB}. ${resultado}. Após finalizar, o jogo fica imutável e os pontos vão para o ranking.`;
 }
 
@@ -639,6 +725,12 @@ function ResumoFinalizado({ jogo, timeA, timeB, esporte }) {
                 ? `Vitória de ${timeB?.nome ?? 'Time B'}`
                 : 'Empate'}
           </p>
+          {jogo.vencedorPorDesempate && (
+            <p className="inline-flex items-center gap-1 text-[11px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-2 py-0.5 mt-2 font-semibold">
+              <Handshake size={11} />
+              Decidido por desempate (placar manteve)
+            </p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs">
           <ResumoTime time={timeA} placar={placarA} pontos={jogo.pontosTimeA ?? 0} />

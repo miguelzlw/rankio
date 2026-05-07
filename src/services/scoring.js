@@ -89,6 +89,9 @@ export function determinarVencedor(jogo) {
 }
 
 // Aplica os pontos de vencedor/perdedor/empate nos pontos parciais que vieram dos eventos.
+// Se jogo.vencedorOverride estiver setado (ex: decisao por penaltis em empate de
+// mata-mata), usa esse vencedor em vez de calcular pelo placar — mas os pontos
+// aplicados ainda sao V/P (vencedor/perdedor), nao E (empate), pois alguem ganhou.
 // Retorna { pontosTimeA, pontosTimeB, vencedor }.
 export function aplicarPontosFinais(jogo, esporte) {
   const placarA = jogo.placarTimeA ?? 0;
@@ -100,16 +103,24 @@ export function aplicarPontosFinais(jogo, esporte) {
   const pPerd = esporte?.pontosPerdedor ?? 0;
   const pEmp = esporte?.pontosEmpate ?? 0;
 
+  // Override tem prioridade
   let vencedor = null;
-  if (placarA > placarB) {
+  if (jogo.vencedorOverride) {
+    vencedor = jogo.vencedorOverride;
+  } else if (placarA > placarB) {
     vencedor = jogo.timeAId;
-    pontosA += pVenc;
-    pontosB += pPerd;
   } else if (placarB > placarA) {
     vencedor = jogo.timeBId;
+  }
+
+  if (vencedor === jogo.timeAId) {
+    pontosA += pVenc;
+    pontosB += pPerd;
+  } else if (vencedor === jogo.timeBId) {
     pontosB += pVenc;
     pontosA += pPerd;
   } else {
+    // Sem vencedor: empate de verdade
     pontosA += pEmp;
     pontosB += pEmp;
   }

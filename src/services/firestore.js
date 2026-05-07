@@ -120,6 +120,9 @@ export async function iniciarJogo(id) {
 // rapidamente, sem transaction o `jogo` em memoria pode estar desatualizado
 // e um update sobrescreve o anterior. Transaction le o estado mais recente
 // e escreve atomicamente — Firestore re-executa se houver conflito.
+// Limpa vencedorOverride se o placar nao esta mais empatado (override eh
+// pra desempate manual; se o placar resolveu naturalmente, override nao
+// faz mais sentido).
 export async function lancarEvento(jogo, regras, novoEvento) {
   const ref = doc(db, 'jogos', jogo.id);
   await runTransaction(db, async (tx) => {
@@ -128,13 +131,18 @@ export async function lancarEvento(jogo, regras, novoEvento) {
     const atual = snap.data();
     const eventos = [...(atual.eventos || []), novoEvento];
     const calc = calcularPlacarJogo(eventos, regras);
-    tx.update(ref, {
+    const update = {
       eventos,
       placarTimeA: calc.placarTimeA,
       placarTimeB: calc.placarTimeB,
       pontosTimeA: calc.pontosTimeA,
       pontosTimeB: calc.pontosTimeB,
-    });
+    };
+    if (calc.placarTimeA !== calc.placarTimeB && atual.vencedorOverride) {
+      update.vencedorOverride = null;
+      update.vencedorPorDesempate = false;
+    }
+    tx.update(ref, update);
   });
 }
 
@@ -147,36 +155,69 @@ export async function removerEvento(jogo, regras, eventoId) {
     const atual = snap.data();
     const eventos = (atual.eventos || []).filter((e) => e.id !== eventoId);
     const calc = calcularPlacarJogo(eventos, regras);
-    tx.update(ref, {
+    const update = {
       eventos,
       placarTimeA: calc.placarTimeA,
       placarTimeB: calc.placarTimeB,
       pontosTimeA: calc.pontosTimeA,
       pontosTimeB: calc.pontosTimeB,
-    });
+    };
+    if (calc.placarTimeA !== calc.placarTimeB && atual.vencedorOverride) {
+      update.vencedorOverride = null;
+      update.vencedorPorDesempate = false;
+    }
+    tx.update(ref, update);
   });
 }
 
-// Define vencedor manualmente (usado em esportes coletivos sem placar, tipo torta na cara).
-// Aceita timeAId, timeBId ou null (empate). Atualiza o placar simbolicamente para refletir o vencedor:
-// vencedor recebe placar=1, perdedor=0; empate=1×1.
+// Define vencedor manualmente. Comportamento depende do placar atual:
+//
+// 1) Placar 0x0 (esporte coletivo sem regras, tipo torta na cara):
+//    Coloca placar simbolico (1x0, 0x1 ou 1x1 em empate) pra refletir o resultado.
+//
+// 2) Placar nao-empate (ex: 3x2): MANTEM o placar atual e usa vencedorOverride
+//    pra forcar o vencedor escolhido (caso o usuario queira contradizer o placar
+//    — raro, mas possivel).
+//
+// 3) Placar empatado com gols (ex: 3x3) — caso de penaltis em mata-mata:
+//    MANTEM o empate e usa vencedorOverride pra registrar quem ganhou no desempate.
+//
+// vencedorOverride eh lido por aplicarPontosFinais e finalizarJogo: se setado,
+// vence ele em vez do calculo pelo placar.
 export async function definirVencedorManual(jogo, vencedorTimeId) {
-  let placarA = 0;
-  let placarB = 0;
-  if (vencedorTimeId === jogo.timeAId) placarA = 1;
-  else if (vencedorTimeId === jogo.timeBId) placarB = 1;
-  else {
-    placarA = 1;
-    placarB = 1;
+  const placarA = jogo.placarTimeA ?? 0;
+  const placarB = jogo.placarTimeB ?? 0;
+  const placarZerado = placarA === 0 && placarB === 0;
+
+  const update = {};
+
+  if (placarZerado) {
+    // Placar simbolico
+    if (vencedorTimeId === jogo.timeAId) {
+      update.placarTimeA = 1;
+      update.placarTimeB = 0;
+    } else if (vencedorTimeId === jogo.timeBId) {
+      update.placarTimeA = 0;
+      update.placarTimeB = 1;
+    } else {
+      update.placarTimeA = 1;
+      update.placarTimeB = 1;
+    }
+    // Sem override - placar simbolico ja decide o vencedor
+    update.vencedorOverride = null;
+    update.vencedorPorDesempate = false;
+  } else {
+    // Mantem placar. Usa override se contradiz o placar (ou eh empate).
+    update.vencedorOverride = vencedorTimeId ?? null;
+    update.vencedorPorDesempate = placarA === placarB && !!vencedorTimeId;
   }
-  await updateDoc(doc(db, 'jogos', jogo.id), {
-    placarTimeA: placarA,
-    placarTimeB: placarB,
-  });
+
+  await updateDoc(doc(db, 'jogos', jogo.id), update);
 }
 
-// Finaliza jogo: aplica pontosVencedor/Perdedor/Empate, define vencedor pelo placar,
-// e propaga o vencedor pro proximo jogo do bracket (se houver).
+// Finaliza jogo: aplica pontosVencedor/Perdedor/Empate, define vencedor pelo placar
+// (ou pelo vencedorOverride se setado, ex: penaltis), e propaga o vencedor pro
+// proximo jogo do bracket (se houver).
 // Retorna { ok: true } ou { ok: false, motivo }.
 export async function finalizarJogo(jogo, esporte) {
   const ehMataMata = jogo.fase === 'mata-mata';
@@ -184,7 +225,8 @@ export async function finalizarJogo(jogo, esporte) {
   const placarB = jogo.placarTimeB ?? 0;
   const empate = placarA === placarB;
 
-  if (ehMataMata && empate) {
+  // Em mata-mata empate so eh permitido se ha um vencedorOverride (penaltis/desempate manual)
+  if (ehMataMata && empate && !jogo.vencedorOverride) {
     return { ok: false, motivo: 'empate' };
   }
 
@@ -230,6 +272,8 @@ export async function reabrirJogo(jogo, esporte, todosJogos = []) {
   batch.update(doc(db, 'jogos', jogo.id), {
     status: 'ao_vivo',
     vencedor: null,
+    vencedorOverride: null,
+    vencedorPorDesempate: false,
     finalizadoEm: null,
     placarTimeA: calc.placarTimeA,
     placarTimeB: calc.placarTimeB,

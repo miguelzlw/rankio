@@ -87,6 +87,11 @@ function JogoBracket({ jogo, timesPorId }) {
         placar={fim || aoVivo ? jogo.placarTimeB ?? 0 : null}
         vencedor={fim && jogo.vencedor === jogo.timeBId}
       />
+      {fim && jogo.vencedorPorDesempate && (
+        <p className="text-[9px] text-emerald-400 font-semibold uppercase tracking-wider text-center mt-1">
+          desempate
+        </p>
+      )}
     </div>
   );
 }
