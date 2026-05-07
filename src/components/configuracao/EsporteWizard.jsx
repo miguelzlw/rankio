@@ -33,6 +33,7 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
   const [pontosVencedor, setPontosVencedor] = useState(esporteEdicao?.pontosVencedor ?? 5);
   const [pontosPerdedor, setPontosPerdedor] = useState(esporteEdicao?.pontosPerdedor ?? 0);
   const [pontosEmpate, setPontosEmpate] = useState(esporteEdicao?.pontosEmpate ?? 1);
+  const [registrarAutor, setRegistrarAutor] = useState(esporteEdicao?.registrarAutor ?? false);
   const [regras, setRegras] = useState(
     esporteEdicao?.regras?.length
       ? migrarRegrasAntigas(esporteEdicao.regras)
@@ -67,6 +68,7 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
         pontosVencedor: Number(pontosVencedor) || 0,
         pontosPerdedor: Number(pontosPerdedor) || 0,
         pontosEmpate: Number(pontosEmpate) || 0,
+        registrarAutor: !!registrarAutor,
       };
 
       if (editando) {
@@ -365,9 +367,31 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                     },
                   ])
                 }
+
               >
                 <Plus size={14} /> Adicionar evento
               </Button>
+            </section>
+
+            {/* Toggle: registrar autor do evento (artilharia) */}
+            <section>
+              <label className="flex items-start gap-3 bg-surface/40 border border-white/10 rounded-xl p-3 cursor-pointer hover:bg-surface/60 hover:border-accent/30 transition">
+                <input
+                  type="checkbox"
+                  checked={registrarAutor}
+                  onChange={(e) => setRegistrarAutor(e.target.checked)}
+                  className="w-5 h-5 mt-0.5 accent-accent flex-shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-text">
+                    Registrar autor de cada evento
+                  </p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Pergunta quem fez ao clicar num evento (ex: gol). Habilita ranking
+                    de artilharia. Cadastre os jogadores em cada time.
+                  </p>
+                </div>
+              </label>
             </section>
           </div>
         )}

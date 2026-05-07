@@ -176,6 +176,35 @@ export function calcularRanking(times = [], esportes = [], jogos = []) {
     .sort((a, b) => b.total - a.total);
 }
 
+// Calcula artilharia de um esporte: top N autores de eventos.
+// Considera tanto jogos finalizados quanto ao_vivo (eventos ja contam).
+// Retorna [{ autor, time, eventos: { regraNome: count, _total: total }}] ordenado.
+export function calcularArtilharia(esporteId, jogos = [], times = []) {
+  const timesPorId = new Map((times || []).map((t) => [t.id, t]));
+  // chave eh `${timeId}|${autor}` pra nao misturar jogadores homonimos de times distintos
+  const acumulado = new Map();
+  for (const j of jogos || []) {
+    if (j.esporteId !== esporteId) continue;
+    if (j.status !== 'finalizado' && j.status !== 'ao_vivo') continue;
+    for (const ev of j.eventos || []) {
+      if (!ev.autor) continue;
+      const timeId = ev.timeAfetado === 'A' ? j.timeAId : j.timeBId;
+      if (!timeId) continue;
+      const chave = `${timeId}|${ev.autor}`;
+      const slot = acumulado.get(chave) || {
+        autor: ev.autor,
+        time: timesPorId.get(timeId) ?? null,
+        eventos: {},
+        total: 0,
+      };
+      slot.eventos[ev.regraNome] = (slot.eventos[ev.regraNome] ?? 0) + 1;
+      slot.total += 1;
+      acumulado.set(chave, slot);
+    }
+  }
+  return Array.from(acumulado.values()).sort((a, b) => b.total - a.total);
+}
+
 // Classifica os times de um grupo (ou subconjunto num esporte).
 // Criterios: pontos no esporte → saldo de placar → confronto direto → ordem cadastro.
 export function classificarGrupo(timesDoGrupo = [], jogosDoEsporte = [], esporteId) {

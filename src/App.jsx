@@ -1,7 +1,6 @@
 import React, { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import BottomNav from "./components/common/BottomNav";
-import JogoAgora from "./components/common/JogoAgora.jsx";
 
 // Code-split das paginas: cada uma vira um chunk separado, carregado on-demand.
 const Ranking = lazy(() => import("./pages/Ranking"));
@@ -45,7 +44,6 @@ function App() {
           </Routes>
         </Suspense>
       </main>
-      <JogoAgora />
       <BottomNav />
     </div>
   );

@@ -36,6 +36,7 @@ export default function JogoDetalhe() {
   const [flashB, setFlashB] = useState(false);
   const [vencedorManualAberto, setVencedorManualAberto] = useState(false);
   const [processando, setProcessando] = useState(false);
+  const [autorPendente, setAutorPendente] = useState(null); // { regra, timeAfetado } enquanto pergunta o autor
   const toast = useToast();
 
   const esporte = esportes.find((e) => e.id === esporteId);
@@ -65,6 +66,15 @@ export default function JogoDetalhe() {
   }
 
   async function handleEvento(regra, timeAfetado) {
+    // Se esporte pede autor: abre modal antes de lancar.
+    if (esporte.registrarAutor) {
+      setAutorPendente({ regra, timeAfetado });
+      return;
+    }
+    await registrarEvento(regra, timeAfetado, null);
+  }
+
+  async function registrarEvento(regra, timeAfetado, autor) {
     const evento = {
       id: genEventoId(),
       regraId: regra.id,
@@ -73,6 +83,7 @@ export default function JogoDetalhe() {
       timestampCronometro: cronometro.tempoMs,
       timestamp: Date.now(),
     };
+    if (autor) evento.autor = autor;
     await lancarEvento(jogo, esporte.regras, evento);
     if (timeAfetado === 'A') {
       setFlashA(true);
@@ -81,6 +92,13 @@ export default function JogoDetalhe() {
       setFlashB(true);
       setTimeout(() => setFlashB(false), 350);
     }
+  }
+
+  async function handleEscolherAutor(autor) {
+    if (!autorPendente) return;
+    const { regra, timeAfetado } = autorPendente;
+    setAutorPendente(null);
+    await registrarEvento(regra, timeAfetado, autor);
   }
 
   async function handleRemoverEvento() {
@@ -316,7 +334,11 @@ export default function JogoDetalhe() {
                             style={{ backgroundColor: time?.cor || '#94a3b8' }}
                           />
                           <span className="flex-1 truncate">
-                            {ev.regraNome} — {time?.nome ?? '?'}
+                            <span className="font-medium">{ev.regraNome}</span>
+                            <span className="text-slate-400"> — {time?.nome ?? '?'}</span>
+                            {ev.autor && (
+                              <span className="text-accent"> · {ev.autor}</span>
+                            )}
                           </span>
                           <button
                             onClick={() => setEventoARemover(ev)}
@@ -460,7 +482,67 @@ export default function JogoDetalhe() {
         </div>
       </Modal>
 
+      {/* Modal de selecao de autor (artilharia) */}
+      <ModalAutor
+        autorPendente={autorPendente}
+        timeA={timeA}
+        timeB={timeB}
+        onEscolher={handleEscolherAutor}
+        onCancelar={() => setAutorPendente(null)}
+      />
     </div>
+  );
+}
+
+function ModalAutor({ autorPendente, timeA, timeB, onEscolher, onCancelar }) {
+  if (!autorPendente) return null;
+  const time = autorPendente.timeAfetado === 'A' ? timeA : timeB;
+  const cor = time?.cor || '#94a3b8';
+  const jogadores = time?.jogadores ?? [];
+
+  return (
+    <Modal
+      open={!!autorPendente}
+      onClose={onCancelar}
+      title={`Quem fez "${autorPendente.regra.nome}"?`}
+    >
+      <div className="space-y-2">
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border-l-4"
+          style={{ borderColor: cor, backgroundColor: cor + '15' }}
+        >
+          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: cor }} />
+          <span className="text-sm font-semibold text-text">{time?.nome ?? '—'}</span>
+        </div>
+
+        {jogadores.length === 0 ? (
+          <div className="bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs rounded-lg p-3">
+            Nenhum jogador cadastrado neste time. Vá em <strong>Configuração → Times</strong> e
+            adicione jogadores, ou registre sem autor abaixo.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {jogadores.map((jogador) => (
+              <button
+                key={jogador}
+                onClick={() => onEscolher(jogador)}
+                className="text-left border border-white/10 hover:border-white/30 text-text rounded-lg px-3 py-3 text-sm font-medium transition active:scale-95 truncate"
+                style={{ backgroundColor: cor + '15' }}
+              >
+                {jogador}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <button
+          onClick={() => onEscolher(null)}
+          className="w-full mt-2 text-xs text-slate-400 hover:text-text border border-dashed border-white/15 hover:border-white/30 rounded-lg py-2.5 transition"
+        >
+          Registrar sem autor
+        </button>
+      </div>
+    </Modal>
   );
 }
 
@@ -586,7 +668,11 @@ function ResumoFinalizado({ jogo, timeA, timeB, esporte }) {
                     style={{ backgroundColor: time?.cor || '#94a3b8' }}
                   />
                   <span className="flex-1 truncate">
-                    {ev.regraNome} — {time?.nome ?? '?'}
+                    <span className="font-medium">{ev.regraNome}</span>
+                    <span className="text-slate-400"> — {time?.nome ?? '?'}</span>
+                    {ev.autor && (
+                      <span className="text-accent"> · {ev.autor}</span>
+                    )}
                   </span>
                 </li>
               );

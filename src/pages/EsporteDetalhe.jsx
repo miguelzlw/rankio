@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useEsportes, useJogos, useTimes } from '../hooks/useDados.js';
-import { ChevronDown, Wand2, Radio, Calendar, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, Wand2, Radio, Calendar, CheckCircle2, Crown, Target } from 'lucide-react';
 import Badge from '../components/common/Badge.jsx';
 import TimeChip from '../components/common/TimeChip.jsx';
 import BackButton from '../components/common/BackButton.jsx';
 import { useToast } from '../components/common/ToastProvider.jsx';
-import { pontuacaoTimeNoEsporte } from '../services/scoring.js';
+import { pontuacaoTimeNoEsporte, calcularArtilharia } from '../services/scoring.js';
 import { gerarMataMataAposGrupos, podeGerarMataMata } from '../services/firestore.js';
 
 export default function EsporteDetalhe() {
@@ -126,6 +126,10 @@ export default function EsporteDetalhe() {
             ))}
           </ul>
         </section>
+      )}
+
+      {esporte.registrarAutor && (
+        <SecaoArtilharia esporteId={esporteId} jogos={jogos} times={times} />
       )}
 
       {jogosDoEsporte.length === 0 && (
@@ -248,6 +252,79 @@ function CardJogo({ jogo, esporteId, timesPorId, destaque, apagado }) {
           <TimeChip time={timeB} size="sm" placeholder="A definir" />
         </div>
       </Link>
+    </li>
+  );
+}
+
+function SecaoArtilharia({ esporteId, jogos, times }) {
+  const artilharia = calcularArtilharia(esporteId, jogos, times);
+  if (artilharia.length === 0) {
+    return (
+      <section className="bg-surface/50 border border-white/10 rounded-2xl p-3">
+        <h2 className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-2 px-1 flex items-center gap-1.5">
+          <Target size={14} className="text-accent" />
+          Artilharia
+        </h2>
+        <p className="text-xs text-slate-500 text-center py-2">
+          Nenhum evento registrado com autor ainda.
+        </p>
+      </section>
+    );
+  }
+  const top3 = artilharia.slice(0, 3);
+  const restante = artilharia.slice(3);
+  return (
+    <section className="bg-surface/50 border border-white/10 rounded-2xl p-3">
+      <h2 className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-3 px-1 flex items-center gap-1.5">
+        <Target size={14} className="text-accent" />
+        Artilharia
+      </h2>
+      <ul className="space-y-1.5">
+        {top3.map((a, i) => (
+          <ItemArtilharia key={`${a.time?.id}|${a.autor}`} dado={a} idx={i} destaque />
+        ))}
+        {restante.map((a, i) => (
+          <ItemArtilharia key={`${a.time?.id}|${a.autor}`} dado={a} idx={i + 3} />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ItemArtilharia({ dado, idx, destaque }) {
+  const cor = dado.time?.cor || '#94a3b8';
+  const eLider = idx === 0 && destaque;
+  return (
+    <li
+      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg ${
+        eLider ? 'bg-accent/10 border border-accent/30' : ''
+      }`}
+    >
+      <span
+        className={`w-6 h-6 flex items-center justify-center rounded-md text-xs font-bold flex-shrink-0 ${
+          eLider
+            ? 'bg-accent text-background'
+            : idx < 3
+              ? 'bg-white/10 text-text'
+              : 'text-slate-500'
+        }`}
+      >
+        {eLider ? <Crown size={12} /> : idx + 1}
+      </span>
+      <span
+        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+        style={{ backgroundColor: cor }}
+      />
+      <span className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-text truncate">{dado.autor}</p>
+        <p className="text-[11px] text-slate-400 truncate">{dado.time?.nome ?? '—'}</p>
+      </span>
+      <span className="text-right">
+        <span className="font-bold text-accent tabular-nums leading-none">{dado.total}</span>
+        <span className="block text-[10px] text-slate-500 uppercase tracking-wider">
+          {dado.total === 1 ? 'evento' : 'eventos'}
+        </span>
+      </span>
     </li>
   );
 }

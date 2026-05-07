@@ -28,12 +28,13 @@ export const esportesCol = () => collection(db, 'esportes');
 export const jogosCol = () => collection(db, 'jogos');
 
 // ========== TIMES ==========
-export async function criarTime({ nome, cor }) {
+export async function criarTime({ nome, cor, jogadores }) {
   const ref = doc(timesCol());
   await setDoc(ref, {
     id: ref.id,
     nome,
     cor,
+    jogadores: jogadores ?? [],
     criadoEm: serverTimestamp(),
   });
   return ref.id;
@@ -58,6 +59,7 @@ export async function criarEsporte({
   pontosVencedor,
   pontosPerdedor,
   pontosEmpate,
+  registrarAutor,
 }) {
   const ref = doc(esportesCol());
   await setDoc(ref, {
@@ -71,6 +73,7 @@ export async function criarEsporte({
     pontosVencedor: pontosVencedor ?? 0,
     pontosPerdedor: pontosPerdedor ?? 0,
     pontosEmpate: pontosEmpate ?? 0,
+    registrarAutor: !!registrarAutor,
     criadoEm: serverTimestamp(),
   });
   return ref.id;

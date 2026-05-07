@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Users } from 'lucide-react';
 import { useTimes, useJogos } from '../../hooks/useDados.js';
 import Button from '../common/Button.jsx';
 import Modal from '../common/Modal.jsx';
@@ -15,20 +15,50 @@ export default function TimesManager() {
   const { data: jogos } = useJogos();
   const [editando, setEditando] = useState(null);
   const [removendo, setRemovendo] = useState(null);
+  const [novoJogador, setNovoJogador] = useState('');
   const toast = useToast();
 
   function abrirNovo() {
-    setEditando({ id: null, nome: '', cor: PALETA_DEFAULT });
+    setEditando({ id: null, nome: '', cor: PALETA_DEFAULT, jogadores: [] });
+    setNovoJogador('');
+  }
+
+  function abrirEdicao(t) {
+    setEditando({ ...t, jogadores: t.jogadores ?? [] });
+    setNovoJogador('');
+  }
+
+  function adicionarJogador() {
+    const nome = novoJogador.trim();
+    if (!nome) return;
+    if ((editando.jogadores ?? []).some((j) => j.toLowerCase() === nome.toLowerCase())) {
+      toast.warning('Esse jogador já está cadastrado neste time.');
+      return;
+    }
+    setEditando({ ...editando, jogadores: [...(editando.jogadores ?? []), nome] });
+    setNovoJogador('');
+  }
+
+  function removerJogador(nome) {
+    setEditando({
+      ...editando,
+      jogadores: (editando.jogadores ?? []).filter((j) => j !== nome),
+    });
   }
 
   async function salvar() {
     if (!editando.nome.trim()) return;
     try {
+      const dados = {
+        nome: editando.nome,
+        cor: editando.cor,
+        jogadores: editando.jogadores ?? [],
+      };
       if (editando.id) {
-        await atualizarTime(editando.id, { nome: editando.nome, cor: editando.cor });
+        await atualizarTime(editando.id, dados);
         toast.success(`Time "${editando.nome}" atualizado.`);
       } else {
-        await criarTime({ nome: editando.nome, cor: editando.cor });
+        await criarTime(dados);
         toast.success(`Time "${editando.nome}" criado.`);
       }
       setEditando(null);
@@ -71,35 +101,46 @@ export default function TimesManager() {
         </p>
       ) : (
         <ul className="space-y-2">
-          {times.map((t) => (
-            <li
-              key={t.id}
-              className="flex items-center gap-3 bg-surface/50 border border-white/10 rounded-xl p-3 transition hover:bg-surface/70 hover:border-white/20"
-            >
-              <span
-                className="w-6 h-6 rounded-lg flex-shrink-0 ring-2 ring-white/10"
-                style={{
-                  backgroundColor: t.cor,
-                  boxShadow: `0 2px 8px -2px ${t.cor}80`,
-                }}
-              />
-              <span className="flex-1 font-medium text-text truncate">{t.nome}</span>
-              <button
-                onClick={() => setEditando({ ...t })}
-                className="text-slate-400 hover:text-accent p-1 transition"
-                aria-label="Editar"
+          {times.map((t) => {
+            const numJogadores = t.jogadores?.length ?? 0;
+            return (
+              <li
+                key={t.id}
+                className="flex items-center gap-3 bg-surface/50 border border-white/10 rounded-xl p-3 transition hover:bg-surface/70 hover:border-white/20"
               >
-                <Pencil size={16} />
-              </button>
-              <button
-                onClick={() => setRemovendo(t)}
-                className="text-slate-400 hover:text-red-400 p-1 transition"
-                aria-label="Remover"
-              >
-                <Trash2 size={16} />
-              </button>
-            </li>
-          ))}
+                <span
+                  className="w-6 h-6 rounded-lg flex-shrink-0 ring-2 ring-white/10"
+                  style={{
+                    backgroundColor: t.cor,
+                    boxShadow: `0 2px 8px -2px ${t.cor}80`,
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-text truncate">{t.nome}</p>
+                  {numJogadores > 0 && (
+                    <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                      <Users size={11} />
+                      {numJogadores} {numJogadores === 1 ? 'jogador' : 'jogadores'}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => abrirEdicao(t)}
+                  className="text-slate-400 hover:text-accent p-1 transition"
+                  aria-label="Editar"
+                >
+                  <Pencil size={16} />
+                </button>
+                <button
+                  onClick={() => setRemovendo(t)}
+                  className="text-slate-400 hover:text-red-400 p-1 transition"
+                  aria-label="Remover"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
@@ -134,6 +175,64 @@ export default function TimesManager() {
                 onChange={(cor) => setEditando({ ...editando, cor })}
                 usedColors={coresUsadas}
               />
+            </div>
+
+            {/* Jogadores - opcional, usado quando esporte tem 'registrarAutor' ativo */}
+            <div>
+              <label className="text-sm font-medium block mb-1 text-slate-300 flex items-center gap-1.5">
+                <Users size={14} className="text-accent" />
+                Jogadores
+                <span className="text-xs text-slate-500 font-normal">(opcional)</span>
+              </label>
+              <p className="text-xs text-slate-500 mb-2">
+                Cadastre os jogadores se quiser registrar quem fez cada gol/ponto.
+              </p>
+
+              {(editando.jogadores ?? []).length > 0 && (
+                <ul className="flex flex-wrap gap-1.5 mb-2">
+                  {editando.jogadores.map((j) => (
+                    <li
+                      key={j}
+                      className="inline-flex items-center gap-1 bg-accent/15 border border-accent/30 text-text text-xs rounded-full pl-2.5 pr-1 py-1"
+                    >
+                      <span>{j}</span>
+                      <button
+                        type="button"
+                        onClick={() => removerJogador(j)}
+                        className="text-slate-400 hover:text-red-400 transition rounded-full p-0.5"
+                        aria-label={`Remover ${j}`}
+                      >
+                        <X size={12} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={novoJogador}
+                  onChange={(e) => setNovoJogador(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      adicionarJogador();
+                    }
+                  }}
+                  className="flex-1 border border-white/20 bg-black/20 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent placeholder-white/30"
+                  placeholder="Nome do jogador"
+                />
+                <Button
+                  type="button"
+                  size="md"
+                  variant="outline"
+                  onClick={adicionarJogador}
+                  disabled={!novoJogador.trim()}
+                >
+                  <Plus size={14} /> Add
+                </Button>
+              </div>
             </div>
           </div>
         )}
