@@ -33,6 +33,9 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
   const [pontosVencedor, setPontosVencedor] = useState(esporteEdicao?.pontosVencedor ?? 5);
   const [pontosPerdedor, setPontosPerdedor] = useState(esporteEdicao?.pontosPerdedor ?? 0);
   const [pontosEmpate, setPontosEmpate] = useState(esporteEdicao?.pontosEmpate ?? 1);
+  const [pontosCampeao, setPontosCampeao] = useState(esporteEdicao?.pontosCampeao ?? 10);
+  const [pontosVice, setPontosVice] = useState(esporteEdicao?.pontosVice ?? 5);
+  const [pontosTerceiro, setPontosTerceiro] = useState(esporteEdicao?.pontosTerceiro ?? 2);
   const [registrarAutor, setRegistrarAutor] = useState(esporteEdicao?.registrarAutor ?? false);
   const [regras, setRegras] = useState(
     esporteEdicao?.regras?.length
@@ -68,6 +71,9 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
         pontosVencedor: Number(pontosVencedor) || 0,
         pontosPerdedor: Number(pontosPerdedor) || 0,
         pontosEmpate: Number(pontosEmpate) || 0,
+        pontosCampeao: Number(pontosCampeao) || 0,
+        pontosVice: Number(pontosVice) || 0,
+        pontosTerceiro: Number(pontosTerceiro) || 0,
         registrarAutor: !!registrarAutor,
       };
 
@@ -100,6 +106,9 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
 
   // Em mata-mata 1v1 nao se permite empate, entao escondemos o campo.
   const ehMataMataPuro = tipo === '1v1' && formato === 'mata-mata';
+  // Pontos pra 1o/2o/3o so aplicaveis a 1v1 (mata-mata ou grupos+mm), pois sao
+  // os unicos formatos com 'campeao' final claro.
+  const temCampeonato = tipo === '1v1';
 
   return (
     <Modal
@@ -276,6 +285,44 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                 )}
               </div>
             </section>
+
+            {/* Pontos extras do campeonato (final do mata-mata) */}
+            {temCampeonato && (
+              <section>
+                <h3 className="text-sm font-semibold text-slate-200 mb-1 flex items-center gap-2">
+                  <Trophy size={14} className="text-accent" />
+                  Bônus de campeonato
+                </h3>
+                <p className="text-xs text-slate-400 mb-3">
+                  Pontos extras aplicados quando o mata-mata acaba. Vão direto pro
+                  ranking dos classificados.
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <CampoPontos
+                    label="🥇 Campeão"
+                    cor="text-accent"
+                    valor={pontosCampeao}
+                    onChange={setPontosCampeao}
+                  />
+                  <CampoPontos
+                    label="🥈 Vice"
+                    cor="text-slate-200"
+                    valor={pontosVice}
+                    onChange={setPontosVice}
+                  />
+                  <CampoPontos
+                    label="🥉 3º lugar"
+                    cor="text-amber-400"
+                    valor={pontosTerceiro}
+                    onChange={setPontosTerceiro}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  3º lugar é dado a quem perdeu na semifinal. Em torneios de 3 ou
+                  menos times, esse bônus pode não se aplicar.
+                </p>
+              </section>
+            )}
 
             {/* Eventos do jogo */}
             <section>

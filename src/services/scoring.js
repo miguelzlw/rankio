@@ -118,7 +118,8 @@ export function aplicarPontosFinais(jogo, esporte) {
 }
 
 // Soma de pontos do torneio de um time num esporte, considerando jogos finalizados.
-export function pontuacaoTimeNoEsporte(timeId, esporteId, jogos = []) {
+// Se o esporte for fornecido, aplica tambem os bonus de campeao/vice/3o lugar.
+export function pontuacaoTimeNoEsporte(timeId, esporteId, jogos = [], esporte = null) {
   let total = 0;
   for (const j of jogos) {
     if (j.esporteId !== esporteId) continue;
@@ -126,7 +127,41 @@ export function pontuacaoTimeNoEsporte(timeId, esporteId, jogos = []) {
     if (j.timeAId === timeId) total += j.pontosTimeA ?? 0;
     if (j.timeBId === timeId) total += j.pontosTimeB ?? 0;
   }
+  if (esporte) total += bonusCampeonato(timeId, esporte, jogos);
   return total;
+}
+
+// Bonus aplicado ao campeao/vice/terceiro do mata-mata final (1v1).
+// Detecta a final como o jogo mata-mata sem proximoJogoId. Os semifinalistas
+// (3o lugar) sao quem perdeu nos jogos que apontam pra final.
+// Coletivos (rodadas) nao tem 'campeao' formal, retorna 0.
+export function bonusCampeonato(timeId, esporte, jogos = []) {
+  if (!esporte || esporte.tipo !== '1v1') return 0;
+
+  const jogosDoEsporte = jogos.filter((j) => j.esporteId === esporte.id);
+  const final = jogosDoEsporte.find(
+    (j) => j.fase === 'mata-mata' && !j.proximoJogoId && j.status === 'finalizado'
+  );
+  if (!final) return 0;
+
+  const campeao = final.vencedor;
+  if (!campeao) return 0;
+  const vice = campeao === final.timeAId ? final.timeBId : final.timeAId;
+
+  if (timeId === campeao) return esporte.pontosCampeao ?? 0;
+  if (timeId === vice) return esporte.pontosVice ?? 0;
+
+  // 3o lugar: perdedor das semifinais (jogos que apontam pra final)
+  const semis = jogosDoEsporte.filter(
+    (j) => j.proximoJogoId === final.id && j.status === 'finalizado'
+  );
+  for (const semi of semis) {
+    if (!semi.vencedor) continue;
+    const perdedor = semi.vencedor === semi.timeAId ? semi.timeBId : semi.timeAId;
+    if (perdedor === timeId) return esporte.pontosTerceiro ?? 0;
+  }
+
+  return 0;
 }
 
 // Saldo de placar (gols feitos − sofridos) do time num esporte.
@@ -160,14 +195,14 @@ function vencedorConfrontoDireto(idA, idB, esporteId, jogos) {
   return null;
 }
 
-// Ranking geral (todos os esportes somados).
+// Ranking geral (todos os esportes somados, com bonus de campeao/vice/3o).
 export function calcularRanking(times = [], esportes = [], jogos = []) {
   return (times || [])
     .map((time) => {
       const breakdown = {};
       let total = 0;
       for (const esp of esportes || []) {
-        const pts = pontuacaoTimeNoEsporte(time.id, esp.id, jogos);
+        const pts = pontuacaoTimeNoEsporte(time.id, esp.id, jogos, esp);
         breakdown[esp.id] = pts;
         total += pts;
       }

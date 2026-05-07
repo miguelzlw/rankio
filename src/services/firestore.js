@@ -13,6 +13,7 @@ import {
   getDocs,
   query,
   where,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase.js';
 import { calcularPlacarJogo, aplicarPontosFinais, determinarVencedor } from './scoring.js';
@@ -59,6 +60,9 @@ export async function criarEsporte({
   pontosVencedor,
   pontosPerdedor,
   pontosEmpate,
+  pontosCampeao,
+  pontosVice,
+  pontosTerceiro,
   registrarAutor,
 }) {
   const ref = doc(esportesCol());
@@ -73,6 +77,9 @@ export async function criarEsporte({
     pontosVencedor: pontosVencedor ?? 0,
     pontosPerdedor: pontosPerdedor ?? 0,
     pontosEmpate: pontosEmpate ?? 0,
+    pontosCampeao: pontosCampeao ?? 0,
+    pontosVice: pontosVice ?? 0,
+    pontosTerceiro: pontosTerceiro ?? 0,
     registrarAutor: !!registrarAutor,
     criadoEm: serverTimestamp(),
   });
@@ -109,28 +116,44 @@ export async function iniciarJogo(id) {
 }
 
 // Adiciona evento ao jogo e recalcula placar + pontos parciais.
+// Usa transaction para evitar race condition: se o usuario clica eventos
+// rapidamente, sem transaction o `jogo` em memoria pode estar desatualizado
+// e um update sobrescreve o anterior. Transaction le o estado mais recente
+// e escreve atomicamente — Firestore re-executa se houver conflito.
 export async function lancarEvento(jogo, regras, novoEvento) {
-  const eventos = [...(jogo.eventos || []), novoEvento];
-  const calc = calcularPlacarJogo(eventos, regras);
-  await updateDoc(doc(db, 'jogos', jogo.id), {
-    eventos,
-    placarTimeA: calc.placarTimeA,
-    placarTimeB: calc.placarTimeB,
-    pontosTimeA: calc.pontosTimeA,
-    pontosTimeB: calc.pontosTimeB,
+  const ref = doc(db, 'jogos', jogo.id);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error('Jogo nao encontrado');
+    const atual = snap.data();
+    const eventos = [...(atual.eventos || []), novoEvento];
+    const calc = calcularPlacarJogo(eventos, regras);
+    tx.update(ref, {
+      eventos,
+      placarTimeA: calc.placarTimeA,
+      placarTimeB: calc.placarTimeB,
+      pontosTimeA: calc.pontosTimeA,
+      pontosTimeB: calc.pontosTimeB,
+    });
   });
 }
 
-// Remove evento e recalcula placar + pontos parciais.
+// Remove evento e recalcula placar + pontos parciais (tambem com transaction).
 export async function removerEvento(jogo, regras, eventoId) {
-  const eventos = (jogo.eventos || []).filter((e) => e.id !== eventoId);
-  const calc = calcularPlacarJogo(eventos, regras);
-  await updateDoc(doc(db, 'jogos', jogo.id), {
-    eventos,
-    placarTimeA: calc.placarTimeA,
-    placarTimeB: calc.placarTimeB,
-    pontosTimeA: calc.pontosTimeA,
-    pontosTimeB: calc.pontosTimeB,
+  const ref = doc(db, 'jogos', jogo.id);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error('Jogo nao encontrado');
+    const atual = snap.data();
+    const eventos = (atual.eventos || []).filter((e) => e.id !== eventoId);
+    const calc = calcularPlacarJogo(eventos, regras);
+    tx.update(ref, {
+      eventos,
+      placarTimeA: calc.placarTimeA,
+      placarTimeB: calc.placarTimeB,
+      pontosTimeA: calc.pontosTimeA,
+      pontosTimeB: calc.pontosTimeB,
+    });
   });
 }
 

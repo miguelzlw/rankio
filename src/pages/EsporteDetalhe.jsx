@@ -33,7 +33,7 @@ export default function EsporteDetalhe() {
   const classificacao = participantes
     .map((t) => ({
       time: t,
-      pontos: pontuacaoTimeNoEsporte(t.id, esporteId, jogos),
+      pontos: pontuacaoTimeNoEsporte(t.id, esporteId, jogos, esporte),
     }))
     .sort((a, b) => b.pontos - a.pontos);
 
@@ -127,6 +127,8 @@ export default function EsporteDetalhe() {
           </ul>
         </section>
       )}
+
+      <BannerCampeonato esporte={esporte} jogosDoEsporte={jogosDoEsporte} timesPorId={timesPorId} />
 
       {esporte.registrarAutor && (
         <SecaoArtilharia esporteId={esporteId} jogos={jogos} times={times} />
@@ -252,6 +254,96 @@ function CardJogo({ jogo, esporteId, timesPorId, destaque, apagado }) {
           <TimeChip time={timeB} size="sm" placeholder="A definir" />
         </div>
       </Link>
+    </li>
+  );
+}
+
+// Banner que mostra Campeao/Vice/3o lugar com pontos extras quando a final
+// do mata-mata foi finalizada. Detecta a final como o jogo mata-mata sem
+// proximoJogoId. Os semifinalistas perdedores ganham pontos de 3o.
+function BannerCampeonato({ esporte, jogosDoEsporte, timesPorId }) {
+  if (esporte.tipo !== '1v1') return null;
+  const final = jogosDoEsporte.find(
+    (j) => j.fase === 'mata-mata' && !j.proximoJogoId && j.status === 'finalizado'
+  );
+  if (!final || !final.vencedor) return null;
+
+  const campeao = timesPorId.get(final.vencedor);
+  const viceId = final.vencedor === final.timeAId ? final.timeBId : final.timeAId;
+  const vice = timesPorId.get(viceId);
+
+  const semis = jogosDoEsporte.filter(
+    (j) => j.proximoJogoId === final.id && j.status === 'finalizado'
+  );
+  const terceiros = semis
+    .map((semi) => {
+      if (!semi.vencedor) return null;
+      const perdedor = semi.vencedor === semi.timeAId ? semi.timeBId : semi.timeAId;
+      return timesPorId.get(perdedor);
+    })
+    .filter(Boolean);
+
+  const pVenc = esporte.pontosCampeao ?? 0;
+  const pVice = esporte.pontosVice ?? 0;
+  const pTer = esporte.pontosTerceiro ?? 0;
+
+  return (
+    <section className="relative overflow-hidden rounded-2xl border border-accent/40 p-4 bg-gradient-to-br from-accent/15 via-primary/15 to-surface">
+      <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-accent/20 blur-3xl" />
+      <div className="relative">
+        <div className="flex items-center gap-2 mb-3">
+          <Crown size={18} className="text-accent" />
+          <h2 className="text-xs uppercase tracking-wider text-accent font-bold">
+            Campeonato encerrado
+          </h2>
+        </div>
+
+        <ul className="space-y-2">
+          <PodioLinha pos={1} time={campeao} pontos={pVenc} medalha="🥇" cor="from-accent to-yellow-600" />
+          {vice && (
+            <PodioLinha pos={2} time={vice} pontos={pVice} medalha="🥈" cor="from-slate-300 to-slate-500" />
+          )}
+          {terceiros.map((t) => (
+            <PodioLinha
+              key={t.id}
+              pos={3}
+              time={t}
+              pontos={pTer}
+              medalha="🥉"
+              cor="from-amber-700 to-amber-900"
+            />
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function PodioLinha({ pos, time, pontos, medalha, cor }) {
+  const corTime = time?.cor || '#94a3b8';
+  return (
+    <li className="flex items-center gap-3 bg-surface/60 border border-white/10 rounded-xl p-2.5">
+      <span className="text-2xl flex-shrink-0">{medalha}</span>
+      <span
+        className="w-8 h-8 rounded-lg flex-shrink-0 ring-2 ring-white/10"
+        style={{
+          backgroundColor: corTime,
+          boxShadow: `0 2px 8px -2px ${corTime}80`,
+        }}
+      />
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold leading-none mb-0.5">
+          {pos === 1 ? 'Campeão' : pos === 2 ? 'Vice' : '3º lugar'}
+        </p>
+        <p className="font-semibold text-text truncate">{time?.nome ?? '—'}</p>
+      </div>
+      {pontos !== 0 && (
+        <span
+          className={`font-bold tabular-nums text-sm bg-gradient-to-br ${cor} text-background px-2 py-1 rounded-lg flex-shrink-0`}
+        >
+          {pontos > 0 ? '+' : ''}{pontos} pts
+        </span>
+      )}
     </li>
   );
 }
