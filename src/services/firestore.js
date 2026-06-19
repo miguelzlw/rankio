@@ -16,7 +16,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase.js';
-import { calcularPlacarJogo, aplicarPontosFinais, determinarVencedor } from './scoring.js';
+import { calcularPlacarJogo, aplicarPontosFinais, determinarVencedor, calcularSets } from './scoring.js';
 import {
   gerarBracketMataMata,
   gerarFaseGrupos,
@@ -196,6 +196,55 @@ export async function removerEvento(jogo, regras, eventoId) {
   });
 }
 
+// ===== PONTUACAO POR SETS (volei) =====
+// Cada ponto eh um item no log `pontosSet`. O placar do jogo (placarTimeA/B)
+// passa a ser o nº de SETS ganhos — assim finalizarJogo, bracket e ranking
+// continuam funcionando sem mudanca (vencedor = quem tem mais sets).
+// Usa transaction pela mesma razao do lancarEvento (cliques rapidos).
+export async function lancarPontoSet(jogo, esporte, lado) {
+  const cfg = esporte?.config?.sets || {};
+  const ref = doc(db, 'jogos', jogo.id);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error('Jogo nao encontrado');
+    const atual = snap.data();
+    const log = [...(atual.pontosSet || [])];
+    // Se a partida ja esta decidida, ignora pontos extras.
+    if (calcularSets(log, cfg).decidido) return;
+    log.push({ id: `pt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`, lado, timestamp: Date.now() });
+    const r = calcularSets(log, cfg);
+    tx.update(ref, {
+      pontosSet: log,
+      placarTimeA: r.setsA,
+      placarTimeB: r.setsB,
+      pontosTimeA: 0,
+      pontosTimeB: 0,
+    });
+  });
+}
+
+// Desfaz o ultimo ponto do set (remove do fim do log).
+export async function removerPontoSet(jogo, esporte) {
+  const cfg = esporte?.config?.sets || {};
+  const ref = doc(db, 'jogos', jogo.id);
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error('Jogo nao encontrado');
+    const atual = snap.data();
+    const log = [...(atual.pontosSet || [])];
+    if (log.length === 0) return;
+    log.pop();
+    const r = calcularSets(log, cfg);
+    tx.update(ref, {
+      pontosSet: log,
+      placarTimeA: r.setsA,
+      placarTimeB: r.setsB,
+      pontosTimeA: 0,
+      pontosTimeB: 0,
+    });
+  });
+}
+
 // Define vencedor manualmente. Comportamento depende do placar atual:
 //
 // 1) Placar 0x0 (esporte coletivo sem regras, tipo torta na cara):
@@ -292,8 +341,22 @@ export async function reabrirJogo(jogo, esporte, todosJogos = []) {
 
   const batch = writeBatch(db);
 
-  // Recalcula pontos parciais a partir dos eventos atuais (sem bonus de vencedor)
-  const calc = calcularPlacarJogo(jogo.eventos || [], esporte?.regras || []);
+  // Recalcula pontos parciais. Em modo sets, o placar = sets ganhos (derivado do
+  // log de pontos); senao, recalcula a partir dos eventos (sem bonus de vencedor).
+  const ehSets = !!esporte?.config?.sets?.ativo;
+  let novoPlacar;
+  if (ehSets) {
+    const r = calcularSets(jogo.pontosSet || [], esporte.config.sets);
+    novoPlacar = { placarTimeA: r.setsA, placarTimeB: r.setsB, pontosTimeA: 0, pontosTimeB: 0 };
+  } else {
+    const calc = calcularPlacarJogo(jogo.eventos || [], esporte?.regras || []);
+    novoPlacar = {
+      placarTimeA: calc.placarTimeA,
+      placarTimeB: calc.placarTimeB,
+      pontosTimeA: calc.pontosTimeA,
+      pontosTimeB: calc.pontosTimeB,
+    };
+  }
 
   batch.update(doc(db, 'jogos', jogo.id), {
     status: 'ao_vivo',
@@ -301,10 +364,7 @@ export async function reabrirJogo(jogo, esporte, todosJogos = []) {
     vencedorOverride: null,
     vencedorPorDesempate: false,
     finalizadoEm: null,
-    placarTimeA: calc.placarTimeA,
-    placarTimeB: calc.placarTimeB,
-    pontosTimeA: calc.pontosTimeA,
-    pontosTimeB: calc.pontosTimeB,
+    ...novoPlacar,
   });
 
   // Se foi mata-mata, limpa o slot que esse jogo alimentou no proximo jogo

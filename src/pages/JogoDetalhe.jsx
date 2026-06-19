@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Pause, Play, Trash2, Flag, RotateCcw, Trophy, Handshake, Unlock } from 'lucide-react';
+import { Pause, Play, Trash2, Flag, RotateCcw, Trophy, Handshake, Unlock, Plus } from 'lucide-react';
 import { useEsportes, useJogos, useTimes } from '../hooks/useDados.js';
 import useCronometro, { formatarTempo } from '../hooks/useCronometro.js';
 import Button from '../components/common/Button.jsx';
@@ -16,7 +16,10 @@ import {
   finalizarJogo,
   definirVencedorManual,
   reabrirJogo,
+  lancarPontoSet,
+  removerPontoSet,
 } from '../services/firestore.js';
+import { calcularSets } from '../services/scoring.js';
 
 function genEventoId() {
   return `ev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
@@ -58,8 +61,14 @@ export default function JogoDetalhe() {
   const placarA = jogo.placarTimeA ?? 0;
   const placarB = jogo.placarTimeB ?? 0;
   const empate = placarA === placarB;
-  // Em mata-mata pode finalizar com empate se ha vencedorOverride (penaltis)
-  const podeFinalizar = !(ehMataMata && empate) || !!jogo.vencedorOverride;
+  // Modo sets (volei): placar do jogo = sets ganhos; estado derivado do log.
+  const ehSets = !!esporte.config?.sets?.ativo;
+  const estadoSets = ehSets ? calcularSets(jogo.pontosSet || [], esporte.config.sets) : null;
+  // Em mata-mata pode finalizar com empate se ha vencedorOverride (penaltis).
+  // Em sets, so finaliza quando a partida estiver decidida (maioria dos sets).
+  const podeFinalizar = ehSets
+    ? !!estadoSets?.decidido
+    : !(ehMataMata && empate) || !!jogo.vencedorOverride;
   const semRegras = (esporte.regras || []).length === 0;
 
   async function handleIniciar() {
@@ -106,6 +115,21 @@ export default function JogoDetalhe() {
     if (!eventoARemover) return;
     await removerEvento(jogo, esporte.regras, eventoARemover.id);
     setEventoARemover(null);
+  }
+
+  async function handlePontoSet(lado) {
+    await lancarPontoSet(jogo, esporte, lado);
+    if (lado === 'A') {
+      setFlashA(true);
+      setTimeout(() => setFlashA(false), 350);
+    } else {
+      setFlashB(true);
+      setTimeout(() => setFlashB(false), 350);
+    }
+  }
+
+  async function handleDesfazerPonto() {
+    await removerPontoSet(jogo, esporte);
   }
 
   async function handleVencedorRapido(timeId) {
@@ -218,25 +242,28 @@ export default function JogoDetalhe() {
         </div>
       )}
 
-      {/* Placar (gols / placar da partida) */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <PlacarTime
-          time={timeA}
-          placar={placarA}
-          pontosTorneio={jogo.pontosTimeA ?? 0}
-          mostrarPontosTorneio={(jogo.pontosTimeA ?? 0) !== 0}
-          flash={flashA}
-          fallback="Time A"
-        />
-        <PlacarTime
-          time={timeB}
-          placar={placarB}
-          pontosTorneio={jogo.pontosTimeB ?? 0}
-          mostrarPontosTorneio={(jogo.pontosTimeB ?? 0) !== 0}
-          flash={flashB}
-          fallback="Time B"
-        />
-      </div>
+      {/* Placar (gols / placar da partida). Em modo sets, o placar fica dentro
+          do scoreboard de sets (abaixo), entao escondemos aqui. */}
+      {!ehSets && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <PlacarTime
+            time={timeA}
+            placar={placarA}
+            pontosTorneio={jogo.pontosTimeA ?? 0}
+            mostrarPontosTorneio={(jogo.pontosTimeA ?? 0) !== 0}
+            flash={flashA}
+            fallback="Time A"
+          />
+          <PlacarTime
+            time={timeB}
+            placar={placarB}
+            pontosTorneio={jogo.pontosTimeB ?? 0}
+            mostrarPontosTorneio={(jogo.pontosTimeB ?? 0) !== 0}
+            flash={flashB}
+            fallback="Time B"
+          />
+        </div>
+      )}
 
       {/* Acoes por estado */}
       {jogo.status === 'agendado' && (
@@ -253,8 +280,19 @@ export default function JogoDetalhe() {
 
       {jogo.status === 'ao_vivo' && (
         <>
-          {/* Modo "vencedor direto" pra esportes sem regras (coletivos sem placar) */}
-          {semRegras ? (
+          {/* Modo sets (volei): marca ponto a ponto, set fecha sozinho */}
+          {ehSets ? (
+            <SetsAoVivo
+              timeA={timeA}
+              timeB={timeB}
+              estado={estadoSets}
+              config={esporte.config.sets}
+              onPonto={handlePontoSet}
+              onDesfazer={handleDesfazerPonto}
+              onFinalizar={() => setConfirmarFim(true)}
+              podeFinalizar={podeFinalizar}
+            />
+          ) : semRegras ? (
             <section className="space-y-2 mb-4">
               <p className="text-xs text-slate-400 text-center mb-2">
                 Selecione o vencedor da partida:
@@ -664,6 +702,111 @@ function textoConfirmacaoFinal(jogo, esporte, timeA, timeB) {
   return `Placar ${placarA} × ${placarB}. ${resultado}. Após finalizar, o jogo fica imutável e os pontos vão para o ranking.`;
 }
 
+// Scoreboard de sets (volei): mostra o set atual com botoes grandes de +1 por
+// time, sets ja ganhos, historico dos sets e o botao de finalizar (so liberado
+// quando a partida esta decidida).
+function SetsAoVivo({ timeA, timeB, estado, config, onPonto, onDesfazer, onFinalizar, podeFinalizar }) {
+  const setsParaVencer = Math.floor((Number(config.melhorDe) || 3) / 2) + 1;
+  const numSetAtual = estado.sets.length + 1;
+  const decidido = estado.decidido;
+  const venceuA = decidido && estado.vencedor === 'A';
+  const venceuB = decidido && estado.vencedor === 'B';
+
+  return (
+    <section className="space-y-3 mb-4">
+      <div className="bg-surface/50 border border-white/10 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+            {decidido ? 'Partida decidida' : `Set ${numSetAtual}`}
+          </p>
+          <p className="text-[11px] text-slate-500 tabular-nums">
+            Sets {estado.setsA} × {estado.setsB} · 1º a {setsParaVencer}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <BotaoPontoSet
+            time={timeA}
+            pontos={estado.atualA}
+            setsGanhos={estado.setsA}
+            campeao={venceuA}
+            onClick={() => onPonto('A')}
+            disabled={decidido}
+            fallback="Time A"
+          />
+          <BotaoPontoSet
+            time={timeB}
+            pontos={estado.atualB}
+            setsGanhos={estado.setsB}
+            campeao={venceuB}
+            onClick={() => onPonto('B')}
+            disabled={decidido}
+            fallback="Time B"
+          />
+        </div>
+        <button
+          onClick={onDesfazer}
+          className="w-full mt-3 flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-accent border border-white/10 hover:border-accent/40 bg-surface/40 rounded-lg py-2.5 transition"
+        >
+          <RotateCcw size={14} /> Desfazer último ponto
+        </button>
+      </div>
+
+      {estado.sets.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {estado.sets.map((s, i) => (
+            <span
+              key={i}
+              className="text-xs bg-surface/60 border border-white/10 text-slate-300 rounded-full px-2.5 py-1 tabular-nums"
+            >
+              Set {i + 1}: <strong className="text-text">{s.a}–{s.b}</strong>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <Button
+        variant="success"
+        size="lg"
+        className="w-full"
+        disabled={!podeFinalizar}
+        onClick={onFinalizar}
+      >
+        <Flag size={18} />
+        Finalizar partida
+      </Button>
+      {!podeFinalizar && (
+        <p className="text-xs text-slate-400 text-center">
+          A partida termina quando um time vencer {setsParaVencer} sets.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function BotaoPontoSet({ time, pontos, setsGanhos, campeao, onClick, disabled, fallback }) {
+  const cor = time?.cor || '#94a3b8';
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded-2xl p-4 text-white relative overflow-hidden text-left transition active:scale-[0.98] disabled:active:scale-100 disabled:cursor-default"
+      style={{ backgroundColor: cor, boxShadow: `0 6px 20px -8px ${cor}aa` }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
+      <div className="relative">
+        <p className="text-xs font-medium opacity-90 truncate flex items-center gap-1">
+          {campeao && <Trophy size={12} />}
+          {time?.nome ?? fallback}
+        </p>
+        <p className="text-6xl font-bold tabular-nums leading-none mt-1">{pontos}</p>
+        <p className="text-[11px] opacity-80 mt-1 tabular-nums">
+          {disabled ? `${setsGanhos} set(s)` : 'tocar p/ +1 ponto'}
+        </p>
+      </div>
+    </button>
+  );
+}
+
 // Coluna de eventos otimizada pra uso a duas maos no celular: botoes grandes
 // (h-14), borda colorida do time, ativo com cor do time pra diferenciar bem.
 function ColunaEventos({ time, esporte, ladoEvento, onEvento, fallback }) {
@@ -711,6 +854,8 @@ function ColunaEventos({ time, esporte, ladoEvento, onEvento, fallback }) {
 function ResumoFinalizado({ jogo, timeA, timeB, esporte }) {
   const placarA = jogo.placarTimeA ?? 0;
   const placarB = jogo.placarTimeB ?? 0;
+  const ehSets = !!esporte.config?.sets?.ativo;
+  const sets = ehSets ? calcularSets(jogo.pontosSet || [], esporte.config.sets).sets : [];
   return (
     <>
       <section className="bg-surface/50 border border-white/10 rounded-2xl p-4">
@@ -733,9 +878,21 @@ function ResumoFinalizado({ jogo, timeA, timeB, esporte }) {
           )}
         </div>
         <div className="grid grid-cols-2 gap-3 text-xs">
-          <ResumoTime time={timeA} placar={placarA} pontos={jogo.pontosTimeA ?? 0} />
-          <ResumoTime time={timeB} placar={placarB} pontos={jogo.pontosTimeB ?? 0} />
+          <ResumoTime time={timeA} placar={placarA} pontos={jogo.pontosTimeA ?? 0} legendaPlacar={ehSets ? 'sets' : undefined} />
+          <ResumoTime time={timeB} placar={placarB} pontos={jogo.pontosTimeB ?? 0} legendaPlacar={ehSets ? 'sets' : undefined} />
         </div>
+        {ehSets && sets.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 justify-center mt-3">
+            {sets.map((s, i) => (
+              <span
+                key={i}
+                className="text-xs bg-surface/60 border border-white/10 text-slate-300 rounded-full px-2.5 py-1 tabular-nums"
+              >
+                Set {i + 1}: <strong className="text-text">{s.a}–{s.b}</strong>
+              </span>
+            ))}
+          </div>
+        )}
         {jogo.bye && (
           <p className="text-xs text-slate-400 mt-3 text-center">Avanço por bye (W.O.).</p>
         )}
@@ -776,7 +933,7 @@ function ResumoFinalizado({ jogo, timeA, timeB, esporte }) {
   );
 }
 
-function ResumoTime({ time, placar, pontos }) {
+function ResumoTime({ time, placar, pontos, legendaPlacar }) {
   const cor = time?.cor || '#94a3b8';
   return (
     <div className="bg-surface/60 border border-white/10 rounded-xl p-3 text-center">
@@ -785,6 +942,9 @@ function ResumoTime({ time, placar, pontos }) {
         <span className="font-medium text-text truncate">{time?.nome ?? '—'}</span>
       </div>
       <p className="text-3xl font-bold tabular-nums">{placar}</p>
+      {legendaPlacar && (
+        <p className="text-[10px] uppercase tracking-wider text-slate-500 -mt-0.5">{legendaPlacar}</p>
+      )}
       <p
         className={`text-xs tabular-nums mt-0.5 ${
           pontos < 0 ? 'text-red-400' : pontos > 0 ? 'text-accent' : 'text-slate-500'

@@ -47,6 +47,63 @@ function pontosSofreDe(regra) {
   return regra.pontosBSofre || 0;
 }
 
+// ===== PONTUACAO POR SETS (volei) =====
+// Deriva todo o estado dos sets a partir de um log de pontos (igual ao modelo
+// de eventos: cada ponto eh um item { lado: 'A' | 'B' }). Assim o "desfazer"
+// eh so remover o ultimo ponto, e o placar do jogo vira o nº de sets ganhos.
+//
+// config: { melhorDe, pontosPorSet, vantagem2 }
+//   melhorDe     -> total de sets (3 = primeiro a 2; 5 = primeiro a 3)
+//   pontosPorSet -> pontos pra fechar um set (ex: 12)
+//   vantagem2    -> exige 2 pontos de vantagem pra fechar o set
+//
+// Retorna {
+//   sets: [{ a, b }],     // sets ja concluidos
+//   atualA, atualB,       // pontos do set em andamento
+//   setsA, setsB,         // sets ganhos por cada lado (= placar do jogo)
+//   decidido, vencedor    // 'A' | 'B' | null
+// }
+export function calcularSets(log = [], config = {}) {
+  const pontosPorSet = Number(config.pontosPorSet) || 12;
+  const melhorDe = Number(config.melhorDe) || 3;
+  const vantagem2 = !!config.vantagem2;
+  const setsParaVencer = Math.floor(melhorDe / 2) + 1;
+
+  const sets = [];
+  let a = 0;
+  let b = 0;
+  let setsA = 0;
+  let setsB = 0;
+  let decidido = false;
+  let vencedor = null;
+
+  for (const p of log || []) {
+    if (decidido) break; // ignora pontos lancados depois da partida decidida
+    if (p.lado === 'A') a += 1;
+    else if (p.lado === 'B') b += 1;
+    else continue;
+
+    const atingiu = a >= pontosPorSet || b >= pontosPorSet;
+    const margem = !vantagem2 || Math.abs(a - b) >= 2;
+    if (atingiu && margem) {
+      if (a > b) setsA += 1;
+      else setsB += 1;
+      sets.push({ a, b });
+      a = 0;
+      b = 0;
+      if (setsA >= setsParaVencer) {
+        decidido = true;
+        vencedor = 'A';
+      } else if (setsB >= setsParaVencer) {
+        decidido = true;
+        vencedor = 'B';
+      }
+    }
+  }
+
+  return { sets, atualA: a, atualB: b, setsA, setsB, decidido, vencedor };
+}
+
 // Calcula o placar parcial e os pontos parciais do torneio com base nos eventos.
 // Retorna { placarTimeA, placarTimeB, pontosTimeA, pontosTimeB }.
 // Os pontos retornados aqui NAO incluem pontosVencedor/Perdedor/Empate — esses

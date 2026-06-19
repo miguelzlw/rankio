@@ -60,6 +60,11 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
     esporteEdicao?.config?.timesQueAvancam ?? 2
   );
   const [numRodadas, setNumRodadas] = useState(esporteEdicao?.config?.numRodadas ?? 3);
+  // Pontuacao por sets (volei). Padrao: melhor de 3, 12 pontos por set.
+  const [porSets, setPorSets] = useState(!!esporteEdicao?.config?.sets?.ativo);
+  const [melhorDe, setMelhorDe] = useState(esporteEdicao?.config?.sets?.melhorDe ?? 3);
+  const [pontosPorSet, setPontosPorSet] = useState(esporteEdicao?.config?.sets?.pontosPorSet ?? 12);
+  const [vantagem2, setVantagem2] = useState(esporteEdicao?.config?.sets?.vantagem2 ?? false);
   const [pontosVencedor, setPontosVencedor] = useState(esporteEdicao?.pontosVencedor ?? 5);
   const [pontosPerdedor, setPontosPerdedor] = useState(esporteEdicao?.pontosPerdedor ?? 0);
   const [pontosEmpate, setPontosEmpate] = useState(esporteEdicao?.pontosEmpate ?? 1);
@@ -85,18 +90,31 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
 
   async function salvar() {
     try {
-      const config = tipo === '1v1' && formato === 'grupos-mata-mata'
-        ? { numGrupos: Number(numGrupos), timesQueAvancam: Number(timesQueAvancam) }
-        : tipo === 'coletivo'
-          ? { numRodadas: Number(numRodadas) }
-          : {};
+      const config =
+        tipo === '1v1' && formato === 'grupos-mata-mata'
+          ? { numGrupos: Number(numGrupos), timesQueAvancam: Number(timesQueAvancam) }
+          : tipo === 'coletivo'
+            ? { numRodadas: Number(numRodadas) }
+            : {};
+
+      // Sets (volei): so faz sentido em 1v1. Guardado em config.sets, ortogonal
+      // ao formato (mata-mata ou grupos). Em modo sets os eventos nao sao usados.
+      const usaSets = tipo === '1v1' && porSets;
+      if (usaSets) {
+        config.sets = {
+          ativo: true,
+          melhorDe: Number(melhorDe) || 3,
+          pontosPorSet: Number(pontosPorSet) || 12,
+          vantagem2: !!vantagem2,
+        };
+      }
 
       const dados = {
         nome,
         tipo,
         formato: tipo === '1v1' ? formato : null,
         config,
-        regras,
+        regras: usaSets ? [] : regras,
         timesParticipantes: participantes,
         pontosVencedor: Number(pontosVencedor) || 0,
         pontosPerdedor: Number(pontosPerdedor) || 0,
@@ -136,7 +154,8 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
     tipo === '1v1'
       ? formato === 'mata-mata' || (ehGruposMM && !erroGrupos)
       : numRodadas > 0;
-  const podeAvancarP3 = regras.every((r) => r.nome.trim());
+  const usaSets = tipo === '1v1' && porSets;
+  const podeAvancarP3 = usaSets || regras.every((r) => r.nome.trim());
   const podeSalvar = participantes.length >= 2 && !erroGrupos;
 
   // Em mata-mata 1v1 nao se permite empate, entao escondemos o campo.
@@ -281,6 +300,67 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                     </p>
                   )
                 )}
+
+                {/* Pontuacao por sets (volei) */}
+                <div className="border-t border-white/10 pt-4">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={porSets}
+                      onChange={(e) => setPorSets(e.target.checked)}
+                      className="w-5 h-5 mt-0.5 accent-accent flex-shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-text">Pontuação por sets (vôlei)</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        A partida é dividida em sets. Vence quem ganhar a maioria dos sets.
+                        Substitui o placar por eventos.
+                      </p>
+                    </div>
+                  </label>
+
+                  {porSets && (
+                    <div className="mt-3 space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-sm font-medium block mb-1 text-slate-300">Melhor de (sets)</label>
+                          <select
+                            value={melhorDe}
+                            onChange={(e) => setMelhorDe(Number(e.target.value))}
+                            className="w-full border border-white/20 bg-surface text-text rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
+                          >
+                            <option value={3}>3 (primeiro a 2)</option>
+                            <option value={5}>5 (primeiro a 3)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium block mb-1 text-slate-300">Pontos por set</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={pontosPorSet}
+                            onChange={(e) => setPontosPorSet(e.target.value)}
+                            className="w-full border border-white/20 bg-black/20 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                          />
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={vantagem2}
+                          onChange={(e) => setVantagem2(e.target.checked)}
+                          className="w-4 h-4 accent-accent"
+                        />
+                        <span className="text-sm text-slate-300">
+                          Exigir vantagem de 2 pontos pra fechar o set
+                        </span>
+                      </label>
+                      <p className="text-xs text-emerald-300/90 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                        {`Melhor de ${melhorDe} sets de ${pontosPorSet} pontos${vantagem2 ? ' (vantagem de 2)' : ''}. Vence quem fizer ${Math.floor(Number(melhorDe) / 2) + 1} sets.`}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               <div>
@@ -370,6 +450,15 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
               </section>
             )}
 
+            {usaSets && (
+              <div className="bg-sky-500/10 border border-sky-500/30 text-sky-200 text-xs rounded-lg p-3">
+                Modo <strong>sets</strong> ativado: a pontuação é feita por sets (configurada no
+                passo anterior), então não há eventos a definir aqui.
+              </div>
+            )}
+
+            {!usaSets && (
+            <>
             {/* Eventos do jogo */}
             <section>
               <h3 className="text-sm font-semibold text-slate-200 mb-1">Eventos do jogo</h3>
@@ -486,6 +575,8 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                 </div>
               </label>
             </section>
+            </>
+            )}
           </div>
         )}
 
