@@ -9,6 +9,8 @@ const Configuracao = lazy(() => import("./pages/Configuracao"));
 const Chaveamento = lazy(() => import("./pages/Chaveamento"));
 const EsporteDetalhe = lazy(() => import("./pages/EsporteDetalhe"));
 const JogoDetalhe = lazy(() => import("./pages/JogoDetalhe"));
+// Tela isolada/discreta: acessivel so via URL direta, fora do BottomNav.
+const Sorteio = lazy(() => import("./pages/Sorteio"));
 
 function PageFallback() {
   return (
@@ -32,6 +34,7 @@ function App() {
             <Route path="/configuracao" element={<Configuracao />} />
             <Route path="/chaveamento" element={<Chaveamento />} />
             <Route path="/chaveamento/:esporteId" element={<Chaveamento />} />
+            <Route path="/sorteio" element={<Sorteio />} />
             <Route
               path="*"
               element={

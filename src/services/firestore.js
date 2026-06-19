@@ -49,6 +49,32 @@ export async function removerTime(id) {
   await deleteDoc(doc(db, 'times', id));
 }
 
+// Salva o resultado de um sorteio de times: grava a lista sorteada no campo
+// `jogadores` de cada time participante (sobrescreve) e registra um doc de
+// historico na colecao `sorteios`. Tudo num unico batch atomico.
+//   atribuicoes: { [timeId]: string[] }
+//   times: Array<{ id, nome }> (participantes do sorteio)
+export async function salvarSorteio(atribuicoes, times) {
+  const batch = writeBatch(db);
+  const resultado = [];
+
+  for (const t of times || []) {
+    const jogadores = atribuicoes[t.id] || [];
+    batch.update(doc(db, 'times', t.id), {
+      jogadores,
+      atualizadoEm: serverTimestamp(),
+    });
+    resultado.push({ timeId: t.id, timeNome: t.nome, jogadores });
+  }
+
+  batch.set(doc(collection(db, 'sorteios')), {
+    resultado,
+    criadoEm: serverTimestamp(),
+  });
+
+  await batch.commit();
+}
+
 // ========== ESPORTES ==========
 export async function criarEsporte({
   nome,
