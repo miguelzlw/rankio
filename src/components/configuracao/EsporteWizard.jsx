@@ -65,6 +65,10 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
   const [melhorDe, setMelhorDe] = useState(esporteEdicao?.config?.sets?.melhorDe ?? 3);
   const [pontosPorSet, setPontosPorSet] = useState(esporteEdicao?.config?.sets?.pontosPorSet ?? 12);
   const [vantagem2, setVantagem2] = useState(esporteEdicao?.config?.sets?.vantagem2 ?? false);
+  // Disputa de 3o lugar no mata-mata (perdedores das semis jogam pelo 3o). Padrao ligado.
+  const [terceiroLugar, setTerceiroLugar] = useState(
+    esporteEdicao?.config?.terceiroLugar !== false
+  );
   const [pontosVencedor, setPontosVencedor] = useState(esporteEdicao?.pontosVencedor ?? 5);
   const [pontosPerdedor, setPontosPerdedor] = useState(esporteEdicao?.pontosPerdedor ?? 0);
   const [pontosEmpate, setPontosEmpate] = useState(esporteEdicao?.pontosEmpate ?? 1);
@@ -107,6 +111,10 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
           pontosPorSet: Number(pontosPorSet) || 12,
           vantagem2: !!vantagem2,
         };
+      }
+      // Disputa de 3o lugar (so 1v1, que termina em mata-mata).
+      if (tipo === '1v1') {
+        config.terceiroLugar = !!terceiroLugar;
       }
 
       const dados = {
@@ -360,6 +368,25 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                       </p>
                     </div>
                   )}
+                </div>
+
+                {/* Disputa de 3o lugar (mata-mata) */}
+                <div className="border-t border-white/10 pt-4">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={terceiroLugar}
+                      onChange={(e) => setTerceiroLugar(e.target.checked)}
+                      className="w-5 h-5 mt-0.5 accent-accent flex-shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-text">Disputa de 3º lugar</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Os perdedores das duas semifinais jogam pelo 3º lugar. Sem isso, não há
+                        jogo de 3º (e o bônus de 3º não é aplicado).
+                      </p>
+                    </div>
+                  </label>
                 </div>
               </>
             ) : (

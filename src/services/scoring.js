@@ -207,8 +207,10 @@ export function bonusCampeonato(timeId, esporte, jogos = []) {
   if (!esporte || esporte.tipo !== '1v1') return 0;
 
   const jogosDoEsporte = jogos.filter((j) => j.esporteId === esporte.id);
+  // A final eh o jogo de mata-mata sem proximoJogoId — EXCETO a disputa de 3o
+  // lugar (que tambem nao tem proximoJogoId).
   const final = jogosDoEsporte.find(
-    (j) => j.fase === 'mata-mata' && !j.proximoJogoId && j.status === 'finalizado'
+    (j) => j.fase === 'mata-mata' && !j.proximoJogoId && !j.terceiroLugar && j.status === 'finalizado'
   );
   if (!final) return 0;
 
@@ -219,7 +221,17 @@ export function bonusCampeonato(timeId, esporte, jogos = []) {
   if (timeId === campeao) return esporte.pontosCampeao ?? 0;
   if (timeId === vice) return esporte.pontosVice ?? 0;
 
-  // 3o lugar: perdedor das semifinais (jogos que apontam pra final)
+  // 3o lugar: se ha disputa de 3o lugar, o bonus vai para o VENCEDOR dela.
+  const jogoTerceiro = jogosDoEsporte.find(
+    (j) => j.fase === 'mata-mata' && j.terceiroLugar && j.status === 'finalizado'
+  );
+  if (jogoTerceiro) {
+    if (timeId === jogoTerceiro.vencedor) return esporte.pontosTerceiro ?? 0;
+    return 0;
+  }
+
+  // Sem disputa de 3o lugar (bracket antigo / opcao desligada): mantem o
+  // comportamento anterior — os perdedores das semifinais recebem o bonus.
   const semis = jogosDoEsporte.filter(
     (j) => j.proximoJogoId === final.id && j.status === 'finalizado'
   );

@@ -53,15 +53,16 @@ function jogoBase(esporteId, fase, ordem, extras = {}) {
 }
 
 // =========== MATA-MATA DIRETO (1v1) ===========
-export function gerarBracketMataMata(esporteId, times) {
+export function gerarBracketMataMata(esporteId, times, incluirTerceiro = false) {
   if (!times || times.length < 2) return [];
   const embaralhados = shuffle(times);
-  return montarBracketComSeeds(esporteId, embaralhados.map((t) => t.id));
+  return montarBracketComSeeds(esporteId, embaralhados.map((t) => t.id), 1, incluirTerceiro);
 }
 
 // Monta um bracket com seeds ja definidos (pareamento alto vs baixo).
 // `slots` e array de timeIds com `null` representando byes.
-function montarBracketComSeeds(esporteId, seeds, ordemBase = 1) {
+// incluirTerceiro: cria a disputa de 3o lugar (perdedores das semifinais).
+function montarBracketComSeeds(esporteId, seeds, ordemBase = 1, incluirTerceiro = false) {
   const tamanho = nextPowerOfTwo(seeds.length);
   const slots = [...seeds];
   while (slots.length < tamanho) slots.push(null);
@@ -97,7 +98,24 @@ function montarBracketComSeeds(esporteId, seeds, ordemBase = 1) {
     jogosPorRodada.push(curr);
   }
 
-  return resolverByes(jogosPorRodada.flat());
+  const extras = [];
+  // Disputa de 3o lugar: os perdedores das duas semifinais (rodada anterior a
+  // final) se enfrentam. So faz sentido quando ha semifinais (>= 2 rodadas).
+  // Os semis ganham `jogoPerdedorId` + `slotPerdedor`: ao finalizar, o PERDEDOR
+  // eh propagado pra esse jogo (analogo ao vencedor indo pro proximoJogoId).
+  if (incluirTerceiro && totalRodadas >= 2) {
+    const semis = jogosPorRodada[totalRodadas - 2];
+    if (semis && semis.length === 2) {
+      const terceiro = jogoBase(esporteId, 'mata-mata', ordem++, { terceiroLugar: true });
+      semis[0].jogoPerdedorId = terceiro.id;
+      semis[0].slotPerdedor = 'A';
+      semis[1].jogoPerdedorId = terceiro.id;
+      semis[1].slotPerdedor = 'B';
+      extras.push(terceiro);
+    }
+  }
+
+  return resolverByes([...jogosPorRodada.flat(), ...extras]);
 }
 
 // Resolve byes em cascata: jogos onde um lado eh null e o outro nao
@@ -188,7 +206,7 @@ export function gerarFaseGrupos(esporteId, times, numGrupos) {
 
 // Apos finalizar todos os jogos da fase de grupos, monta o mata-mata
 // com os top-N classificados de cada grupo (seeding cruzado).
-export function gerarMataMataPosGrupos({ esporteId, esporteConfig, times, jogos }) {
+export function gerarMataMataPosGrupos({ esporteId, esporteConfig, times, jogos, incluirTerceiro = false }) {
   const composicao = esporteConfig?.grupos || [];
   const timesQueAvancam = esporteConfig?.timesQueAvancam || 1;
   const timesPorId = new Map(times.map((t) => [t.id, t]));
@@ -233,7 +251,7 @@ export function gerarMataMataPosGrupos({ esporteId, esporteConfig, times, jogos 
   // Pareamento cruzado: seeds[0] vs seeds[N-1], seeds[1] vs seeds[N-2], etc.
   // (que e o que `montarBracketComSeeds` ja faz quando recebe na ordem 1..N)
   // Comeca com ordem 1000 pra ficar depois dos jogos de grupo na visualizacao.
-  return montarBracketComSeeds(esporteId, seeds, 1000);
+  return montarBracketComSeeds(esporteId, seeds, 1000, incluirTerceiro);
 }
 
 // =========== COLETIVO (rodadas) ===========

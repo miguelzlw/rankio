@@ -321,6 +321,14 @@ export async function finalizarJogo(jogo, esporte) {
     const campo = jogo.slot === 'A' ? 'timeAId' : 'timeBId';
     batch.update(doc(db, 'jogos', jogo.proximoJogoId), { [campo]: vencedor });
   }
+  // Disputa de 3o lugar: o PERDEDOR da semifinal vai pro jogo de 3o lugar.
+  if (ehMataMata && jogo.jogoPerdedorId && vencedor) {
+    const perdedor = vencedor === jogo.timeAId ? jogo.timeBId : jogo.timeAId;
+    if (perdedor) {
+      const campoP = jogo.slotPerdedor === 'A' ? 'timeAId' : 'timeBId';
+      batch.update(doc(db, 'jogos', jogo.jogoPerdedorId), { [campoP]: perdedor });
+    }
+  }
 
   await batch.commit();
   return { ok: true };
@@ -372,6 +380,11 @@ export async function reabrirJogo(jogo, esporte, todosJogos = []) {
     const campo = jogo.slot === 'A' ? 'timeAId' : 'timeBId';
     batch.update(doc(db, 'jogos', jogo.proximoJogoId), { [campo]: null });
   }
+  // E limpa o slot do perdedor na disputa de 3o lugar (se este era uma semi).
+  if (jogo.fase === 'mata-mata' && jogo.jogoPerdedorId && jogo.vencedor) {
+    const campoP = jogo.slotPerdedor === 'A' ? 'timeAId' : 'timeBId';
+    batch.update(doc(db, 'jogos', jogo.jogoPerdedorId), { [campoP]: null });
+  }
 
   await batch.commit();
   return { ok: true };
@@ -399,6 +412,7 @@ export async function gerarMataMataAposGrupos(esporte, todosJogos, times) {
   const novosJogos = gerarMataMataPosGrupos({
     esporteId: esporte.id,
     esporteConfig: esporte.config,
+    incluirTerceiro: esporte.config?.terceiroLugar !== false,
     times,
     jogos: jogosDoEsporte,
   });
@@ -432,9 +446,10 @@ export async function gerarChaveamento(esporte, times) {
   let novosJogos = [];
   let composicaoGrupos = null;
 
+  const incluirTerceiro = esporte.config?.terceiroLugar !== false;
   if (esporte.tipo === '1v1') {
     if (esporte.formato === 'mata-mata') {
-      novosJogos = gerarBracketMataMata(esporte.id, participantes);
+      novosJogos = gerarBracketMataMata(esporte.id, participantes, incluirTerceiro);
     } else if (esporte.formato === 'grupos-mata-mata') {
       const numGrupos = Number(esporte.config?.numGrupos) || 2;
       const { jogos, composicao } = gerarFaseGrupos(esporte.id, participantes, numGrupos);
