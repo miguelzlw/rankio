@@ -5,9 +5,13 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    /* Fundo escuro tambem no <html>: no iOS, ao "puxar" a tela (overscroll
+       elastico), a area revelada usa o fundo do html. Sem isso, aparece branco. */
+    background-color: hsl(350, 40%, 10%);
   }
   body {
     @apply font-sans bg-background text-text antialiased;
+    min-height: 100dvh;
   }
   button {
     @apply select-none;
