@@ -213,6 +213,21 @@ export function gerarMataMataPosGrupos({ esporteId, esporteConfig, times, jogos 
       if (g.top[pos]) seeds.push(g.top[pos].id);
     }
   }
+  // Exatamente 1 classificado (ex: 1 grupo, avanca 1) = formato "liga": esse time
+  // eh o campeao direto pela fase de grupos, sem mata-mata. Gera um unico jogo de
+  // mata-mata ja finalizado pra reaproveitar o bonus de campeao do ranking
+  // (bonusCampeonato detecta a final como o jogo mata-mata sem proximoJogoId).
+  if (seeds.length === 1) {
+    return [
+      jogoBase(esporteId, 'mata-mata', 1000, {
+        timeAId: seeds[0],
+        timeBId: null,
+        status: 'finalizado',
+        vencedor: seeds[0],
+        bye: true,
+      }),
+    ];
+  }
   if (seeds.length < 2) return [];
 
   // Pareamento cruzado: seeds[0] vs seeds[N-1], seeds[1] vs seeds[N-2], etc.

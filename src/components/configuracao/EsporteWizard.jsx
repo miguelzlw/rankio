@@ -9,6 +9,36 @@ function genId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
+// Valida a config de grupos contra o nº de participantes. Evita combinações
+// impossíveis: grupos com menos de 2 times (sem jogos) ou avançar mais times do
+// que cabe no menor grupo. Retorna mensagem de erro (string) ou null se OK.
+function validarConfigGrupos(nParticipantes, nGrupos, nAvancam) {
+  const G = Number(nGrupos);
+  const A = Number(nAvancam);
+  if (!Number.isInteger(G) || G < 1) return 'Informe ao menos 1 grupo.';
+  if (!Number.isInteger(A) || A < 1) return 'Ao menos 1 time deve avançar por grupo.';
+  const maxGrupos = Math.floor(nParticipantes / 2);
+  const menorGrupo = Math.floor(nParticipantes / G);
+  if (menorGrupo < 2) {
+    return `Com ${nParticipantes} times em ${G} grupos, algum grupo fica com menos de 2 times. Use no máximo ${maxGrupos} grupo(s).`;
+  }
+  if (A > menorGrupo) {
+    return `"Avançam por grupo" (${A}) não pode ser maior que o menor grupo (${menorGrupo} times).`;
+  }
+  return null;
+}
+
+// Descreve o resultado da config válida (pra dar feedback positivo no wizard).
+function resumoConfigGrupos(nParticipantes, nGrupos, nAvancam) {
+  const G = Number(nGrupos);
+  const A = Number(nAvancam);
+  const classificados = G * A;
+  if (classificados === 1) {
+    return 'Formato liga: 1 grupo, o 1º colocado é o campeão direto (sem mata-mata).';
+  }
+  return `${classificados} classificados avançam para o mata-mata.`;
+}
+
 // Regras padrao do modelo NOVO: separam placar (gols) dos pontos do torneio.
 // "Vitoria" virou um campo do esporte (pontosVencedor), nao mais regra.
 const REGRAS_PADRAO_1V1 = [
@@ -96,13 +126,18 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
     onClose();
   }
 
+  const ehGruposMM = tipo === '1v1' && formato === 'grupos-mata-mata';
+  const erroGrupos = ehGruposMM
+    ? validarConfigGrupos(participantes.length, numGrupos, timesQueAvancam)
+    : null;
+
   const podeAvancarP1 = !!nome.trim();
   const podeAvancarP2 =
     tipo === '1v1'
-      ? formato === 'mata-mata' || (numGrupos > 0 && timesQueAvancam > 0)
+      ? formato === 'mata-mata' || (ehGruposMM && !erroGrupos)
       : numRodadas > 0;
   const podeAvancarP3 = regras.every((r) => r.nome.trim());
-  const podeSalvar = participantes.length >= 2;
+  const podeSalvar = participantes.length >= 2 && !erroGrupos;
 
   // Em mata-mata 1v1 nao se permite empate, entao escondemos o campo.
   const ehMataMataPuro = tipo === '1v1' && formato === 'mata-mata';
@@ -234,6 +269,17 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                       />
                     </div>
                   </div>
+                )}
+                {formato === 'grupos-mata-mata' && (
+                  erroGrupos ? (
+                    <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                      {erroGrupos}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-emerald-300/90 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                      {resumoConfigGrupos(participantes.length, numGrupos, timesQueAvancam)}
+                    </p>
+                  )
                 )}
               </>
             ) : (
@@ -477,6 +523,11 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
             <p className="text-xs text-slate-500">
               {participantes.length} de {times.length} times selecionados
             </p>
+            {erroGrupos && (
+              <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
+                {erroGrupos} Ajuste em <strong>Formato</strong> ou troque os participantes.
+              </p>
+            )}
           </>
         )}
       </div>
