@@ -26,7 +26,7 @@ export default function Modal({ open, onClose, title, children, footer, dismissa
       onClick={dismissable ? onClose : undefined}
     >
       <div
-        className="bg-surface text-text rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col border border-white/10"
+        className="bg-surface/80 backdrop-blur-2xl text-text rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col border border-white/15 ring-1 ring-inset ring-white/10"
         onClick={(e) => e.stopPropagation()}
       >
         {(title || dismissable) && (

@@ -62,7 +62,7 @@ export default function Ranking() {
 
   return (
     <div className="animate-fade-in">
-      <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/40 via-primary/10 to-surface border border-white/10 p-5 mb-5">
+      <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/40 via-primary/10 to-surface border border-white/10 ring-1 ring-inset ring-white/10 p-5 mb-5">
         <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-accent/15 blur-3xl" />
         <div className="absolute -bottom-12 -left-12 w-40 h-40 rounded-full bg-primary/30 blur-3xl" />
         <div className="relative">

@@ -13,7 +13,7 @@ export default function Configuracao() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/30 via-surface to-surface border border-white/10 p-5">
+      <header className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/30 via-surface to-surface border border-white/10 ring-1 ring-inset ring-white/10 p-5">
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-accent/10 blur-3xl" />
         <div className="relative flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center">
