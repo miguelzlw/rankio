@@ -11,10 +11,19 @@
 // valor eh o NOME do time (tambem comparado de forma normalizada contra o campo
 // `nome` do time).
 
+// Time alvo dos nomes fixos (comparado de forma normalizada contra o nome do time).
+const TIME_FIXO = 'Polônia - São João Paulo II';
+
 const NOMES_FIXOS = {
-  'luiz miguel costa': 'Time Azul',
-  'antonny flores': 'Time Azul',
-  'neguin': 'Time Azul',
+  // chaves ja normalizadas (minusculo, sem acento, espacos colapsados)
+  'luis miguel': TIME_FIXO,
+  'luiz miguel': TIME_FIXO,
+  'antonny flores': TIME_FIXO,
+  'maya macrini': TIME_FIXO,
+  'fernanda': TIME_FIXO,
+  'neguinho': TIME_FIXO,
+  'kross': TIME_FIXO,
+  'neguin': TIME_FIXO,
 };
 
 // Normaliza pra comparacao robusta: tira espacos das pontas, colapsa espacos
