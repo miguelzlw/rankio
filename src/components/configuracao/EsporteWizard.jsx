@@ -337,6 +337,7 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                             onChange={(e) => setMelhorDe(Number(e.target.value))}
                             className="w-full border border-white/20 bg-surface text-text rounded-lg px-3 py-2 focus:outline-none focus:border-accent"
                           >
+                            <option value={1}>1 (set único)</option>
                             <option value={3}>3 (primeiro a 2)</option>
                             <option value={5}>5 (primeiro a 3)</option>
                           </select>
@@ -364,7 +365,9 @@ export default function EsporteWizard({ open, onClose, esporteEdicao, times }) {
                         </span>
                       </label>
                       <p className="text-xs text-emerald-300/90 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
-                        {`Melhor de ${melhorDe} sets de ${pontosPorSet} pontos${vantagem2 ? ' (vantagem de 2)' : ''}. Vence quem fizer ${Math.floor(Number(melhorDe) / 2) + 1} sets.`}
+                        {Number(melhorDe) === 1
+                          ? `Set único de ${pontosPorSet} pontos${vantagem2 ? ' (vantagem de 2)' : ''}. Quem ganhar o set vence a partida.`
+                          : `Melhor de ${melhorDe} sets de ${pontosPorSet} pontos${vantagem2 ? ' (vantagem de 2)' : ''}. Vence quem fizer ${Math.floor(Number(melhorDe) / 2) + 1} sets.`}
                       </p>
                     </div>
                   )}
