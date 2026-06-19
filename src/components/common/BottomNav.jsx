@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom';
-import { Trophy, Gamepad2, Settings, GitBranch } from 'lucide-react';
+import { Trophy, Gamepad2, Settings, GitBranch, Shuffle } from 'lucide-react';
 
 const itens = [
   { to: '/ranking', label: 'Ranking', Icon: Trophy },
   { to: '/esportes', label: 'Esportes', Icon: Gamepad2 },
   { to: '/chaveamento', label: 'Chaves', Icon: GitBranch },
+  { to: '/sorteio', label: 'Sorteio', Icon: Shuffle },
   { to: '/configuracao', label: 'Config', Icon: Settings },
 ];
 
