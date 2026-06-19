@@ -5,6 +5,7 @@ import Button from '../common/Button.jsx';
 import ConfirmDialog from '../common/ConfirmDialog.jsx';
 import Badge from '../common/Badge.jsx';
 import TimeChip from '../common/TimeChip.jsx';
+import { useToast } from '../common/ToastProvider.jsx';
 import { gerarChaveamento, removerJogo } from '../../services/firestore.js';
 
 export default function JogosManager() {
@@ -15,6 +16,7 @@ export default function JogosManager() {
   const [confirmarGerar, setConfirmarGerar] = useState(false);
   const [removendo, setRemovendo] = useState(null);
   const [gerando, setGerando] = useState(false);
+  const toast = useToast();
 
   const timesPorId = new Map(times.map((t) => [t.id, t]));
   const jogosFiltrados = esporteSelecionado
@@ -27,6 +29,12 @@ export default function JogosManager() {
     setGerando(true);
     try {
       await gerarChaveamento(esporte, times);
+      toast.success(`Chaveamento de "${esporte.nome}" gerado.`);
+    } catch (error) {
+      console.error('Erro ao gerar chaveamento:', error);
+      toast.error(
+        `Não foi possível gerar o chaveamento: ${error?.message || 'erro desconhecido'}.`
+      );
     } finally {
       setGerando(false);
       setConfirmarGerar(false);
@@ -43,7 +51,7 @@ export default function JogosManager() {
 
   return (
     <section>
-      <h2 className="font-semibold mb-3">Jogos</h2>
+      <h2 className="font-semibold mb-3">Fazer chaveamento</h2>
 
       <select
         value={esporteSelecionado}
