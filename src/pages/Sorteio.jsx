@@ -5,11 +5,20 @@ import Button from '../components/common/Button.jsx';
 import { useToast } from '../components/common/ToastProvider.jsx';
 import { sortearTimes } from '../services/sorteio.js';
 import { salvarSorteio } from '../services/firestore.js';
+import LoginGate from '../components/common/LoginGate.jsx';
 
-// Tela isolada de sorteio ao vivo (acessivel so via URL /sorteio, fora do menu).
-// Fase "setup": escolhe times participantes + cola os nomes.
-// Fase "revelacao": revela um nome por clique (ordem round-robin entre times).
+// Sorteio eh acao de operador: exige login (e a escrita no Firestore tambem).
 export default function Sorteio() {
+  return (
+    <LoginGate titulo="Sorteio (operador)">
+      <SorteioInner />
+    </LoginGate>
+  );
+}
+
+// Tela de sorteio ao vivo. Fase "setup": escolhe times + cola nomes.
+// Fase "revelacao": revela um nome por clique (round-robin entre times).
+function SorteioInner() {
   const { data: times, loading } = useTimes();
   const toast = useToast();
 

@@ -20,6 +20,7 @@ import {
   removerPontoSet,
 } from '../services/firestore.js';
 import { calcularSets } from '../services/scoring.js';
+import { useAuth } from '../hooks/useAuth.jsx';
 
 function genEventoId() {
   return `ev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
@@ -41,6 +42,7 @@ export default function JogoDetalhe() {
   const [processando, setProcessando] = useState(false);
   const [autorPendente, setAutorPendente] = useState(null); // { regra, timeAfetado } enquanto pergunta o autor
   const toast = useToast();
+  const { user } = useAuth(); // so o operador logado controla a partida
 
   const esporte = esportes.find((e) => e.id === esporteId);
   const jogo = jogos.find((j) => j.id === jogoId);
@@ -265,8 +267,16 @@ export default function JogoDetalhe() {
         </div>
       )}
 
-      {/* Acoes por estado */}
-      {jogo.status === 'agendado' && (
+      {/* Aviso pra visitante (nao logado) durante a partida */}
+      {!user && jogo.status !== 'finalizado' && (
+        <p className="text-xs text-slate-400 text-center bg-surface/40 border border-white/10 rounded-lg py-2.5">
+          Acompanhe o placar ao vivo. Para controlar a partida, o operador precisa entrar em
+          <strong className="text-slate-200"> Configuração</strong>.
+        </p>
+      )}
+
+      {/* Acoes por estado (somente operador logado) */}
+      {user && jogo.status === 'agendado' && (
         <Button
           variant="primary"
           size="lg"
@@ -278,7 +288,7 @@ export default function JogoDetalhe() {
         </Button>
       )}
 
-      {jogo.status === 'ao_vivo' && (
+      {user && jogo.status === 'ao_vivo' && (
         <>
           {/* Modo sets (volei): marca ponto a ponto, set fecha sozinho */}
           {ehSets ? (
@@ -447,13 +457,15 @@ export default function JogoDetalhe() {
       {jogo.status === 'finalizado' && (
         <>
           <ResumoFinalizado jogo={jogo} timeA={timeA} timeB={timeB} esporte={esporte} />
-          <button
-            onClick={() => setConfirmarReabertura(true)}
-            className="w-full mt-4 flex items-center justify-center gap-2 text-xs text-slate-500 hover:text-amber-400 border border-dashed border-white/10 hover:border-amber-500/40 bg-surface/30 rounded-lg py-2.5 transition"
-          >
-            <Unlock size={14} />
-            Reabrir jogo (corrigir placar)
-          </button>
+          {user && (
+            <button
+              onClick={() => setConfirmarReabertura(true)}
+              className="w-full mt-4 flex items-center justify-center gap-2 text-xs text-slate-500 hover:text-amber-400 border border-dashed border-white/10 hover:border-amber-500/40 bg-surface/30 rounded-lg py-2.5 transition"
+            >
+              <Unlock size={14} />
+              Reabrir jogo (corrigir placar)
+            </button>
+          )}
         </>
       )}
 

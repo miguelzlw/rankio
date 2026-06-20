@@ -2,11 +2,14 @@ import { useTimes, useEsportes } from '../hooks/useDados.js';
 import TimesManager from '../components/configuracao/TimesManager.jsx';
 import EsportesManager from '../components/configuracao/EsportesManager.jsx';
 import JogosManager from '../components/configuracao/JogosManager.jsx';
-import { CheckCircle2, Settings } from 'lucide-react';
+import LoginGate from '../components/common/LoginGate.jsx';
+import { useAuth } from '../hooks/useAuth.jsx';
+import { CheckCircle2, Settings, LogOut } from 'lucide-react';
 
 export default function Configuracao() {
   const { data: times } = useTimes();
   const { data: esportes } = useEsportes();
+  const { user, logout } = useAuth();
 
   const temTimes = times && times.length > 0;
   const temEsportes = esportes && esportes.length > 0;
@@ -19,13 +22,23 @@ export default function Configuracao() {
           <div className="w-12 h-12 rounded-xl bg-accent/15 border border-accent/30 flex items-center justify-center">
             <Settings size={24} className="text-accent" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">Configuração</h1>
             <p className="text-sm text-slate-400">Times, esportes e jogos do torneio.</p>
           </div>
+          {user && (
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-red-400 border border-white/10 hover:border-red-500/40 bg-surface/40 rounded-lg px-2.5 py-1.5 transition"
+              title={user.email}
+            >
+              <LogOut size={14} /> Sair
+            </button>
+          )}
         </div>
       </header>
 
+      <LoginGate titulo="Configuração (operador)">
       {(!temTimes || !temEsportes) && (
         <div className="bg-surface/50 rounded-2xl p-4 border border-white/10 backdrop-blur-sm">
           <p className="text-sm font-semibold mb-3 text-accent">Como montar seu torneio</p>
@@ -63,6 +76,7 @@ export default function Configuracao() {
       <TimesManager />
       {temTimes && <EsportesManager />}
       {temTimes && temEsportes && <JogosManager />}
+      </LoginGate>
     </div>
   );
 }

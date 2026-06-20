@@ -7,6 +7,7 @@ import GrupoTable from '../components/chaveamento/GrupoTable.jsx';
 import RodadasColetivo from '../components/chaveamento/RodadasColetivo.jsx';
 import BackButton from '../components/common/BackButton.jsx';
 import { useToast } from '../components/common/ToastProvider.jsx';
+import { useAuth } from '../hooks/useAuth.jsx';
 import { gerarMataMataAposGrupos, podeGerarMataMata } from '../services/firestore.js';
 
 export default function Chaveamento() {
@@ -241,7 +242,19 @@ function RenderEsporte({ esporte, jogos, times, timesPorId }) {
 function BotaoGerarMM({ esporte, todosJogos, times }) {
   const [gerando, setGerando] = useState(false);
   const toast = useToast();
+  const { user } = useAuth();
   const podeGerar = podeGerarMataMata(esporte, todosJogos);
+
+  // Gerar o mata-mata eh acao de operador.
+  if (!user) {
+    return (
+      <div className="bg-surface/50 rounded-xl p-4 border border-white/10 text-center">
+        <p className="text-sm text-slate-400">
+          O mata-mata aparece aqui quando o operador gerá-lo.
+        </p>
+      </div>
+    );
+  }
 
   async function handleGerar() {
     setGerando(true);
