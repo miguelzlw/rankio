@@ -1,45 +1,57 @@
-// Auth do operador. Leitura do app eh livre; o login serve pra liberar as
-// acoes de escrita (criar/pontuar/finalizar/sortear). A seguranca de verdade
-// esta nas regras do Firestore (escrita exige request.auth != null).
+// "Login" do operador via SENHA simples (sem Firebase Auth, sem console).
 //
-// Nao ha cadastro no app: a conta do operador eh criada no console do Firebase
-// (Authentication > Users), provedor Email/Senha.
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  setPersistence,
-  browserLocalPersistence,
-} from 'firebase/auth';
-import { auth } from '../services/firebase.js';
+// Por que assim: ativar o Firebase Authentication exige configurar o console do
+// projeto. Pra destravar o uso sem depender disso, usamos uma senha de operador
+// guardada no app. Quem souber a senha edita; visitantes so veem.
+//
+// LIMITE DE SEGURANCA: isso eh um "cadeado" no app (client-side) — impede
+// edicao casual por visitantes, mas NAO tranca o banco em si. Pra protecao real
+// no banco (regras do Firestore), seria preciso ativar o Firebase Auth.
+//
+// A senha vem de VITE_OPERATOR_SENHA (defina no .env.local e na Vercel). Se nao
+// definida, cai num padrao pra funcionar de imediato.
+import { createContext, useContext, useState, useCallback } from 'react';
 
 const AuthContext = createContext(null);
+const CHAVE_LS = 'rankio_operador';
+const SENHA = import.meta.env.VITE_OPERATOR_SENHA || '645678';
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [carregando, setCarregando] = useState(true);
+  const [desbloqueado, setDesbloqueado] = useState(() => {
+    try {
+      return localStorage.getItem(CHAVE_LS) === '1';
+    } catch {
+      return false;
+    }
+  });
 
-  useEffect(() => {
-    // Mantem a sessao no dispositivo (operador loga uma vez).
-    setPersistence(auth, browserLocalPersistence).catch(() => {});
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setCarregando(false);
-    });
-    return unsub;
-  }, []);
-
-  const login = useCallback(async (email, senha) => {
-    await signInWithEmailAndPassword(auth, email, senha);
+  const login = useCallback(async (senha) => {
+    if (String(senha) !== String(SENHA)) {
+      const err = new Error('senha-invalida');
+      err.code = 'senha-invalida';
+      throw err;
+    }
+    try {
+      localStorage.setItem(CHAVE_LS, '1');
+    } catch {
+      /* ignora se localStorage indisponivel */
+    }
+    setDesbloqueado(true);
   }, []);
 
   const logout = useCallback(async () => {
-    await signOut(auth);
+    try {
+      localStorage.removeItem(CHAVE_LS);
+    } catch {
+      /* ignora */
+    }
+    setDesbloqueado(false);
   }, []);
 
+  // Mantem a mesma interface de antes (user/carregando) pra nao mexer no resto.
+  const user = desbloqueado ? { operador: true } : null;
   return (
-    <AuthContext.Provider value={{ user, carregando, login, logout }}>
+    <AuthContext.Provider value={{ user, carregando: false, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

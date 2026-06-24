@@ -24,20 +24,18 @@ export default function LoginGate({ children, titulo = 'Área restrita' }) {
 export function LoginForm({ titulo = 'Entrar' }) {
   const { login } = useAuth();
   const toast = useToast();
-  const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [enviando, setEnviando] = useState(false);
 
   async function entrar(e) {
     e.preventDefault();
-    if (!email.trim() || !senha) return;
+    if (!senha) return;
     setEnviando(true);
     try {
-      await login(email.trim(), senha);
-      toast.success('Login feito. Você pode editar agora.');
+      await login(senha);
+      toast.success('Liberado. Você pode editar agora.');
     } catch (err) {
-      console.error('Erro de login:', err);
-      toast.error('E-mail ou senha inválidos.');
+      toast.error('Senha inválida.');
     } finally {
       setEnviando(false);
     }
@@ -56,22 +54,15 @@ export function LoginForm({ titulo = 'Entrar' }) {
         Apenas o operador edita. Visitantes continuam vendo o ranking e as chaves normalmente.
       </p>
       <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="E-mail"
-        autoComplete="username"
-        className="w-full border border-white/20 bg-black/20 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent placeholder-white/30"
-      />
-      <input
         type="password"
         value={senha}
         onChange={(e) => setSenha(e.target.value)}
-        placeholder="Senha"
+        placeholder="Senha do operador"
         autoComplete="current-password"
+        autoFocus
         className="w-full border border-white/20 bg-black/20 text-white rounded-lg px-3 py-2 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent placeholder-white/30"
       />
-      <Button type="submit" className="w-full" disabled={enviando || !email.trim() || !senha}>
+      <Button type="submit" className="w-full" disabled={enviando || !senha}>
         <LogIn size={16} /> {enviando ? 'Entrando…' : 'Entrar'}
       </Button>
     </form>
